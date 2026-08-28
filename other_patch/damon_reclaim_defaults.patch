@@ -1,0 +1,5 @@
+--- a/mm/damon/reclaim.c
++++ b/mm/damon/reclaim.c
+@@ -50,1 +50,1 @@
+-static unsigned long min_age __read_mostly = 120000000;
++static unsigned long min_age __read_mostly = 30000000;

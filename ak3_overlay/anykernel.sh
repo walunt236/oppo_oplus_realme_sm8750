@@ -1,0 +1,75 @@
+### AnyKernel3 Ramdisk Mod Script
+## osm0sis @ xda-developers — 一加13
+
+### AnyKernel setup
+# global properties
+properties() { '
+kernel.string=AnyKernel3 by walunt236
+do.devicecheck=0
+do.modules=0
+do.systemless=0
+do.cleanup=1
+do.cleanuponabort=0
+device.name1=
+device.name2=
+device.name3=
+device.name4=
+device.name5=
+supported.versions=
+supported.patchlevels=
+supported.vendorpatchlevels=
+'; } # end properties
+
+# boot shell variables
+BLOCK=boot;
+IS_SLOT_DEVICE=auto;
+RAMDISK_COMPRESSION=auto;
+PATCH_VBMETA_FLAG=auto;
+NO_MAGISK_CHECK=1;
+
+# import functions/variables and setup patching - see for reference (DO NOT REMOVE)
+. tools/ak3-core.sh;
+
+# boot install（一加13：split_boot 适配，无 ramdisk 时直接 flash）
+split_boot
+if [ -f "split_img/ramdisk.cpio" ]; then
+    unpack_ramdisk
+    write_boot
+else
+    flash_boot
+fi
+## end boot install
+
+ui_print "内核构建者: walunt236"
+# Resolving occasional file system I/O latency issues which may cause binary execution exceptions
+sync
+sleep 0.5
+chmod -R 755 $AKHOME/tools
+
+if [ -f "$AKHOME/zram.zip" ]; then
+    MODULE_PATH="$AKHOME/zram.zip"
+    KSUD_PATH="/data/adb/ksud"
+    if [ -f "$KSUD_PATH" ]; then
+        ui_print "Installing zram Module..."
+        /data/adb/ksud module install "$MODULE_PATH"
+        ui_print "Installation Complete!"
+    else
+        ui_print "KSUD Not Found, skipping installation..."
+    fi
+else
+    ui_print "ZRAM module Not Found, skipping ZRAM module installation..."
+fi
+
+if [ -f "$AKHOME/kpn.zip" ]; then
+    MODULE_PATH="$AKHOME/kpn.zip"
+    KSUD_PATH="/data/adb/ksud"
+    if [ -f "$KSUD_PATH" ]; then
+        ui_print "Installing KP-N Module..."
+        /data/adb/ksud module install "$MODULE_PATH"
+        ui_print "Installation Complete!"
+    else
+        ui_print "KSUD Not Found, skipping installation..."
+    fi
+else
+    ui_print "KP-N module Not Found, skipping KP-N module installation..."
+fi

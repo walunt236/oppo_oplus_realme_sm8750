@@ -1,0 +1,259 @@
+name: oneplus13 内核编译
+
+on:
+  workflow_dispatch:
+    inputs:
+      runner_type:
+        description: '编译机'
+        required: true
+        type: choice
+        default: 'self-hosted'
+        options:
+          - 'self-hosted'
+      ksu_type:
+        description: 'KernelSU类型'
+        required: true
+        type: choice
+        default: 'ksu'
+        options:
+          - 'resukisu'
+          - 'sukisu'
+          - 'ksunext'
+          - 'ksu'
+          - 'none'
+      susfs_enable:
+        description: '集成susfs'
+        required: true
+        type: boolean
+        default: false
+      kpm_enable:
+        description: '集成kpm'
+        required: true
+        type: choice
+        default: 'false'
+        options:
+          - 'false'
+          - 'builtin'
+          - 'kpn'
+      lz4kd_enable:
+        description: '集成LZ4KD补丁'
+        required: true
+        type: boolean
+        default: true
+      droidspaces_enable:
+        description: '集成Droidspaces容器支持'
+        required: true
+        type: choice
+        default: 'false'
+        options:
+          - 'false'
+          - 'standard'
+          - 'extend'
+      rekernel_enable:
+        description: 'Re-Kernel支持'
+        required: true
+        type: boolean
+        default: false
+      baseband_guard:
+        description: '基带保护'
+        required: true
+        type: boolean
+        default: false
+      rcu_nocb_enable:
+        description: 'RCU_NOCB_CPU'
+        required: true
+        type: boolean
+        default: true
+      ccache_update:
+        description: '更新ccache缓存'
+        required: true
+        type: boolean
+        default: false
+      ccache_debug:
+        description: '上传Ccache调试日志'
+        required: true
+        type: boolean
+        default: false
+      kernel_suffix:
+        description: '内核后缀'
+        required: false
+        type: string
+        default: ''
+      diagnosis:
+        description: '诊断模式：仅生成并导出config'
+        required: true
+        type: boolean
+        default: false
+      o3_selective:
+        description: 'O3'
+        required: true
+        type: boolean
+        default: true
+      clean_build:
+        description: '强制干净构建'
+        required: true
+        type: boolean
+        default: false
+
+jobs:
+  build:
+    runs-on: ${{ inputs.runner_type }}
+    timeout-minutes: 180
+    outputs:
+      ksuver: ${{ steps.ksu_version.outputs.ksuver }}
+      ak3name: ${{ steps.create_zip.outputs.ak3name }}
+      sub_version: ${{ steps.init_env.outputs.sub_version }}
+      kernel_name: ${{ steps.init_env.outputs.kernel_name }}
+    permissions:
+      actions: write
+      contents: write
+    env:
+      LOG_FILE: ${{ github.workspace }}/build_summary.log
+      RUNNER_TYPE: ${{ inputs.runner_type }}
+      KSU_TYPE: ${{ inputs.ksu_type }}
+      SUSFS_ENABLE: ${{ inputs.susfs_enable }}
+      KPM_ENABLE: ${{ inputs.kpm_enable }}
+      LZ4KD_ENABLE: ${{ inputs.lz4kd_enable }}
+      DROIDSPACES_ENABLE: ${{ inputs.droidspaces_enable }}
+      REKERNEL_ENABLE: ${{ inputs.rekernel_enable }}
+      BASEBAND_GUARD: ${{ inputs.baseband_guard }}
+      RCU_NOCB_ENABLE: ${{ inputs.rcu_nocb_enable }}
+      CCACHE_UPDATE: ${{ inputs.ccache_update }}
+      CCACHE_DEBUG_INPUT: ${{ inputs.ccache_debug }}
+      KERNEL_SUFFIX_INPUT: ${{ inputs.kernel_suffix }}
+      DIAGNOSIS: ${{ inputs.diagnosis }}
+      O3_SELECTIVE: ${{ inputs.o3_selective }}
+      CLEAN_BUILD: ${{ inputs.clean_build }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: 同步仓库代码
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          git init -q 2>/dev/null || true
+          git remote remove origin 2>/dev/null || true
+          git remote add origin "https://github.com/$GITHUB_REPOSITORY.git"
+          git -c http.version=HTTP/1.1 fetch origin "$GITHUB_REF_NAME" --depth=1 2>/dev/null || \
+            git -c http.proxy=http://127.0.0.1:7897 -c https.proxy=http://127.0.0.1:7897 fetch origin "$GITHUB_REF_NAME" --depth=1
+          git reset --hard FETCH_HEAD
+          git clean -fdq -e kernel_workspace
+
+      - name: 环境初始化（依赖/源码/工具链）
+        id: init_env
+        run: bash "$GITHUB_WORKSPACE/scripts/init_env.sh"
+
+      - name: ccache 配置
+        run: bash "$GITHUB_WORKSPACE/scripts/ccache_setup.sh"
+
+      - name: 载入 ccache 缓存
+        if: inputs.runner_type == 'ubuntu-latest'
+        uses: actions/cache@v5
+        id: ccache-restore
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ${{ env.CCACHE_REAL_KEY }}-${{ runner.os }}-${{ github.ref_name }}
+          restore-keys: |
+            ${{ env.CCACHE_REAL_KEY }}-${{ runner.os }}-
+            ${{ env.CCACHE_REAL_KEY }}-
+
+      - name: 清除旧 ccache 缓存
+        if: inputs.ccache_update
+        run: |
+          if gh cache delete ${{ env.CCACHE_REAL_KEY }}-${{ runner.os }}-${{ github.ref_name }} -R ${{ github.repository }}; then
+            echo "[INFO] 旧 ccache 缓存删除成功"
+          else
+            echo "[INFO] 旧 ccache 缓存清理跳过"
+          fi
+
+      - name: 应用补丁（KernelSU/SUSFS/lz4/风驰/功能开关）
+        run: bash "$GITHUB_WORKSPACE/scripts/apply_patches.sh"
+
+      - name: 注入配置（defconfig/cmdline/版本固化）
+        run: bash "$GITHUB_WORKSPACE/scripts/config_inject.sh"
+
+      - name: 准备 AutoFDO profile
+        run: |
+          AFDO_DIR="$HOME/.cache_patches/afdo"
+          mkdir -p "$AFDO_DIR"
+          if [ ! -s "$AFDO_DIR/kernel.afdo" ]; then
+            echo "[ERROR] AutoFDO profile 缺失" | tee -a "$LOG_FILE"
+            echo "[ERROR] 请先自采集 profile：设备采样 → build_afdo.py 解析 → llvm-profdata merge → cp 到 $AFDO_DIR/kernel.afdo" | tee -a "$LOG_FILE"
+            echo "[ERROR] 注意：云端 runner（ubuntu-latest）无长期缓存，AutoFDO 构建仅 self-hosted 可用" | tee -a "$LOG_FILE"
+            exit 1
+          fi
+
+          AFDO_HASH=$(md5sum "$AFDO_DIR/kernel.afdo" | cut -c1-8)
+          AFDO_LINK="$AFDO_DIR/kernel-$AFDO_HASH.afdo"
+          ln -sf kernel.afdo "$AFDO_LINK"
+          echo "AFDO_PROFILE=$AFDO_LINK" >> $GITHUB_ENV
+          echo "[INFO] AutoFDO profile 就绪: $AFDO_LINK (hash=$AFDO_HASH)" | tee -a "$LOG_FILE"
+
+      - name: 编译内核
+        if: ${{ !inputs.diagnosis }}
+        run: bash "$GITHUB_WORKSPACE/scripts/build_kernel.sh"
+
+      - name: 上传诊断配置文本
+        if: inputs.diagnosis
+        uses: actions/upload-artifact@v7
+        with:
+          name: kernel-config-${{ github.run_id }}
+          if-no-files-found: warn
+          path: kernel_workspace/common/out/build_config.txt
+
+      - name: 汇总并打印构建日志
+        if: always()
+        run: |
+          echo "=================================================="
+          if [ -f "$LOG_FILE" ]; then
+            cat "$LOG_FILE"
+          else
+            echo "[INFO] 暂无构建日志"
+          fi
+          echo "=================================================="
+
+      - name: 保存新的 ccache 缓存
+        if: ${{ inputs.runner_type == 'ubuntu-latest' && (inputs.ccache_update || steps.ccache-restore.outputs.cache-hit != 'true') && !inputs.diagnosis }}
+        uses: actions/cache/save@v5
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ${{ env.CCACHE_REAL_KEY }}-${{ runner.os }}-${{ github.ref_name }}
+
+      - name: 打包发布
+        if: ${{ !inputs.diagnosis }}
+        id: create_zip
+        run: bash "$GITHUB_WORKSPACE/scripts/package.sh"
+
+      - name: 上传 Ccache 调试日志
+        if: ${{ always() && inputs.ccache_debug && !inputs.diagnosis }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: ccache-debug-log
+          path: ${{ github.workspace }}/kernel_workspace/ccache.log
+
+      - name: 上传 ZIP (仅云端)
+        if: ${{ !inputs.diagnosis && inputs.runner_type == 'ubuntu-latest' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: ak3-release
+          path: ${{ github.workspace }}/kernel_workspace/AnyKernel*.zip
+          if-no-files-found: error
+
+      - name: 发布 Release (仅云端)
+        if: ${{ !inputs.diagnosis && inputs.runner_type == 'ubuntu-latest' }}
+        run: |
+          cd "$GITHUB_WORKSPACE/kernel_workspace"
+
+          TIME_TAG="$(TZ='Asia/Shanghai' date +'%Y%m%d-%H%M')"
+          RELEASE_TAG="v${{ env.KERNEL_VERSION }}.${{ env.SUB_VERSION }}-${TIME_TAG}"
+          RELEASE_TITLE="OnePlus13 内核 v${{ env.KERNEL_VERSION }}.${{ env.SUB_VERSION }} [${{ inputs.ksu_type }}]"
+
+          BUILD_TIME="$(TZ='Asia/Shanghai' date +'%Y-%m-%d %H:%M:%S')"
+          RELEASE_NOTES=" **一加13 内核编译完成**
+          - **构建时间**: ${BUILD_TIME}
+          - **KernelSU**: ${{ inputs.ksu_type }} (${{ env.KSUVER }})
+          - **SUSFS**: ${{ inputs.susfs_enable }}
+          - **KPM**: ${{ inputs.kpm_enable }}"
+
+          gh release create "$RELEASE_TAG" \
+            --title "$RELEASE_TITLE" \
+            --notes "$RELEASE_NOTES" \
+            AnyKernel3*.zip
