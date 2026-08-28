@@ -44,7 +44,7 @@ if [ -d AnyKernel3/.git ]; then
   info "AnyKernel3 仓库已存在，增量同步..."
   # 旧缓存 origin 是 cctv18，纠正为官方 fork（walunt236）
   git -C AnyKernel3 remote set-url origin https://github.com/walunt236/AnyKernel3 2>/dev/null || true
-  if git -C AnyKernel3 fetch --depth=1 origin && git -C AnyKernel3 reset --hard FETCH_HEAD; then
+  if glr fetch -C AnyKernel3 --depth=1 origin && git -C AnyKernel3 reset --hard FETCH_HEAD; then
     CLONE_OK=1
   else
     warn "AnyKernel3 增量拉取失败，使用本地已有版本"
@@ -54,7 +54,7 @@ fi
 if [[ $CLONE_OK -ne 1 ]]; then
   rm -rf AnyKernel3
   for i in 1 2 3 4 5 6 7 8; do
-    if git clone https://github.com/walunt236/AnyKernel3 --depth=1 AnyKernel3; then
+    if glr clone https://github.com/walunt236/AnyKernel3 --depth=1 AnyKernel3; then
       CLONE_OK=1
       break
     fi

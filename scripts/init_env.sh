@@ -65,7 +65,7 @@ if [ -d "common/.git" ]; then
   cd common
   OEM_FETCH_OK=0
   for i in 1 2 3; do
-    git fetch --depth=1 origin "$OEM_BRANCH" && OEM_FETCH_OK=1 && break
+    glr fetch --depth=1 origin "$OEM_BRANCH" && OEM_FETCH_OK=1 && break
     warn "OEM fetch 失败(第${i}次)，5 秒后重试..."
     sleep 5
   done
@@ -74,12 +74,14 @@ if [ -d "common/.git" ]; then
   git clean -fd -e /out/
   cd ..
 else
+  rm -rf common
   info "首次克隆 OEM 内核源码仓库..."
   for i in 1 2 3; do
-    git clone --depth=1 \
+    glr clone --depth=1 \
       https://github.com/OnePlusOSS/android_kernel_common_oneplus_sm8750.git \
       -b "$OEM_BRANCH" \
       common && break
+    rm -rf common
     warn "OEM 内核仓库克隆失败(第${i}次)，5 秒后重试..."
     sleep 5
   done
@@ -91,7 +93,7 @@ if [ -d "vendor_modules/.git" ]; then
   ( cd vendor_modules && {
       VM_FETCH_OK=0
       for i in 1 2 3; do
-        git fetch --depth=1 origin "$OEM_BRANCH" && VM_FETCH_OK=1 && break
+        glr fetch --depth=1 origin "$OEM_BRANCH" && VM_FETCH_OK=1 && break
         warn "vendor_modules fetch 失败(第${i}次)，5 秒后重试..."
         sleep 5
       done
@@ -102,12 +104,14 @@ if [ -d "vendor_modules/.git" ]; then
   ) &
   VENDOR_PID=$!
 else
+  rm -rf vendor_modules
   info "首次克隆设备树与私有驱动仓库（后台并行）..."
   ( for i in 1 2 3; do
-        git clone --depth=1 \
+        glr clone --depth=1 \
           https://github.com/OnePlusOSS/android_kernel_modules_and_devicetree_oneplus_sm8750.git \
           -b "$OEM_BRANCH" \
           vendor_modules && break
+        rm -rf vendor_modules
         warn "vendor_modules 克隆失败(第${i}次)，5 秒后重试..."
         sleep 5
       done

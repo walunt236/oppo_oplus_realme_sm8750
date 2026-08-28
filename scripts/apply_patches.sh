@@ -8,7 +8,7 @@ cd "$GITHUB_WORKSPACE/kernel_workspace"
 sync_repo() {
   local url="$1" dir="$2" branch="${3:-main}"
   if [ -d "$dir/.git" ]; then
-    if git -C "$dir" fetch --depth=1 origin "$branch"; then
+    if glr fetch -C "$dir" --depth=1 origin "$branch"; then
       git -C "$dir" reset --hard FETCH_HEAD
       info "[动态] $dir 已同步 $branch 最新"
     else
@@ -16,7 +16,7 @@ sync_repo() {
     fi
   else
     rm -rf "$dir"
-    git clone --depth=1 "$url" "$dir" -b "$branch" || { error "补丁仓克隆失败: $url ($branch)"; exit 1; }
+    glr clone --depth=1 "$url" "$dir" -b "$branch" || { error "补丁仓克隆失败: $url ($branch)"; exit 1; }
   fi
 }
 
@@ -27,13 +27,14 @@ if [[ "$KSU_TYPE" == "sukisu" || "$KSU_TYPE" == "resukisu" ]]; then
   info "配置 ReSukiSU..."
   if [ -d KernelSU/.git ]; then
     info "[秒过] ReSukiSU 仓库已存在，增量同步..."
-    if git -C KernelSU fetch origin main 2>/dev/null; then
+    if glr fetch -C KernelSU origin main 2>/dev/null; then
       git -C KernelSU reset --hard FETCH_HEAD
     else
       warn "KernelSU 增量拉取失败，使用本地已有版本"
     fi
   else
-    git clone -b main https://github.com/ReSukiSU/ReSukiSU.git KernelSU
+    rm -rf KernelSU
+    glr clone -b main https://github.com/ReSukiSU/ReSukiSU.git KernelSU
   fi
   ln -sf "$(realpath --relative-to=common/drivers "$PWD/KernelSU/kernel")" common/drivers/kernelsu
   grep -q "kernelsu" common/drivers/Makefile || printf "\nobj-\$(CONFIG_KSU) += kernelsu/\n" >> common/drivers/Makefile
@@ -50,13 +51,14 @@ elif [[ "$KSU_TYPE" == "ksunext" ]]; then
   info "配置 KernelSU Next..."
   if [ -d KernelSU-Next/.git ]; then
     info "[秒过] KernelSU-Next 仓库已存在，增量同步..."
-    if git -C KernelSU-Next fetch origin dev-susfs 2>/dev/null; then
+    if glr fetch -C KernelSU-Next origin dev-susfs 2>/dev/null; then
       git -C KernelSU-Next reset --hard FETCH_HEAD
     else
       warn "KernelSU-Next 增量拉取失败，使用本地已有版本"
     fi
   else
-    git clone -b dev-susfs https://github.com/pershoot/KernelSU-Next.git KernelSU-Next
+    rm -rf KernelSU-Next
+    glr clone -b dev-susfs https://github.com/pershoot/KernelSU-Next.git KernelSU-Next
   fi
   ln -sf "$(realpath --relative-to=common/drivers "$PWD/KernelSU-Next/kernel")" common/drivers/kernelsu
   grep -q "kernelsu" common/drivers/Makefile || printf "\nobj-\$(CONFIG_KSU) += kernelsu/\n" >> common/drivers/Makefile
@@ -80,13 +82,14 @@ elif [[ "$KSU_TYPE" == "ksu" ]]; then
   info "配置原版 KernelSU..."
   if [ -d KernelSU/.git ]; then
     info "[秒过] KernelSU 仓库已存在，增量同步..."
-    if git -C KernelSU fetch origin main 2>/dev/null; then
+    if glr fetch -C KernelSU origin main 2>/dev/null; then
       git -C KernelSU reset --hard FETCH_HEAD
     else
       warn "KernelSU 增量拉取失败，使用本地已有版本"
     fi
   else
-    git clone -b main https://github.com/tiann/KernelSU.git KernelSU
+    rm -rf KernelSU
+    glr clone -b main https://github.com/tiann/KernelSU.git KernelSU
   fi
   ln -sf "$(realpath --relative-to=common/drivers "$PWD/KernelSU/kernel")" common/drivers/kernelsu
   grep -q "kernelsu" common/drivers/Makefile || printf "\nobj-\$(CONFIG_KSU) += kernelsu/\n" >> common/drivers/Makefile
