@@ -30,3 +30,6 @@ droidspaces_patch/  Droidspaces 容器支持补丁
 - LZ4 NEON ASM：[ferstar](https://github.com/ferstar) / [Xiaomichael](https://github.com/Xiaomichael) / [cctv18](https://github.com/cctv18)
 - ADIOS：[firelzrd/adios](https://github.com/firelzrd/adios)
 - wild kernels [https://github.com/WildKernels/OnePlus_KernelSU_SUSFS]
+## 许可证
+
+本项目以 [GPL-2.0](LICENSE) 发布。仓库内补丁遵循 Linux 内核 GPL-2.0；打包环节使用的工具（AnyKernel3、Magisk 提取的 busybox/magiskboot 等）来自各自上游项目，遵循其原始许可证。
