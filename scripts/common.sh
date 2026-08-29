@@ -42,7 +42,7 @@ detect_proxy() {
     echo "https_proxy=http://127.0.0.1:7897" >> "$GITHUB_ENV"
     info "检测到本地代理 127.0.0.1:7897，网络操作走代理"
   else
-    info "未检测到代理，纯直连模式（api/codeload/SSH443 直连可用，AOSP 走 glr 回退）"
+    info "未检测到代理，纯直连模式（api/codeload/SSH443 直连可用，AOSP 走 gproxy 代理）"
   fi
 }
 
