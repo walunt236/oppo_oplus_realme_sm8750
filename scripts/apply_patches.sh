@@ -122,14 +122,29 @@ else
   echo "ksuver=none" >> "$GITHUB_OUTPUT"
 fi
 
+# ===== 补丁仓并行预取 =====
+SUSFS_CACHE_DIR="$HOME/.cache_patches/susfs4ksu"
+ZRAM_CACHE_DIR="$HOME/.cache_patches/zram_patches"
+SUKI_CACHE_DIR="$HOME/.cache_patches/sukisu_patches"
+WILD_DIR="$HOME/.cache_patches/wild_patches"
+mkdir -p "$HOME/.cache_patches"
+
+if [[ "$SUSFS_ENABLE" == "true" && "$KSU_TYPE" != "none" ]]; then
+  sync_repo "https://github.com/ShirkNeko/susfs4ksu.git" "$SUSFS_CACHE_DIR" "gki-android15-6.6" &
+fi
+sync_repo "https://github.com/mrcxlinux/kernel_patches.git" "$ZRAM_CACHE_DIR" &
+if [[ "$LZ4KD_ENABLE" == "true" ]]; then
+  sync_repo "https://github.com/ShirkNeko/SukiSU_patch.git" "$SUKI_CACHE_DIR" &
+fi
+sync_repo "https://github.com/WildKernels/kernel_patches.git" "$WILD_DIR" &
+wait || die "补丁仓预取失败"
+info "补丁仓并行预取完成"
+
 # ===== SUSFS（官方源 ShirkNeko/susfs4ksu，GKI android15-6.6 分支） =====
 if [[ "$SUSFS_ENABLE" == "true" ]]; then
   if [[ "$KSU_TYPE" != "none" ]]; then
     cd "$GITHUB_WORKSPACE/kernel_workspace"
     info "添加 susfs 补丁..."
-    SUSFS_CACHE_DIR="$HOME/.cache_patches/susfs4ksu"
-    mkdir -p "$HOME/.cache_patches"
-    sync_repo "https://github.com/ShirkNeko/susfs4ksu.git" "$SUSFS_CACHE_DIR" "gki-android15-6.6"
 
     rm -rf susfs4ksu
     cp -r "$SUSFS_CACHE_DIR" susfs4ksu
@@ -169,15 +184,12 @@ fi
 
 # ===== lz4/zstd =====
 cd "$GITHUB_WORKSPACE/kernel_workspace/common"
-CACHE_DIR="$HOME/.cache_patches/zram_patches"
-mkdir -p "$HOME/.cache_patches"
-sync_repo "https://github.com/mrcxlinux/kernel_patches.git" "$CACHE_DIR"
 
-cp "$CACHE_DIR/zram/001-lz4.patch" . || exit 1
-cp "$CACHE_DIR/zram/002-zstd.patch" . || exit 1
+cp "$ZRAM_CACHE_DIR/zram/001-lz4.patch" . || exit 1
+cp "$ZRAM_CACHE_DIR/zram/002-zstd.patch" . || exit 1
 
 mkdir -p lib/lz4/lz4armv8
-cp "$CACHE_DIR/zram/lz4armv8.S" lib/lz4/lz4armv8/lz4armv8.S || true
+cp "$ZRAM_CACHE_DIR/zram/lz4armv8.S" lib/lz4/lz4armv8/lz4armv8.S || true
 
 ACCEL_DIR="$HOME/.cache_patches/lz4accel"
 mkdir -p "$ACCEL_DIR"
@@ -205,14 +217,11 @@ fi
 # ===== lz4kd =====
 if [[ "$LZ4KD_ENABLE" == "true" ]]; then
   cd "$GITHUB_WORKSPACE/kernel_workspace/common"
-  CACHE_DIR="$HOME/.cache_patches/sukisu_patches"
-  mkdir -p "$HOME/.cache_patches"
-  sync_repo "https://github.com/ShirkNeko/SukiSU_patch.git" "$CACHE_DIR"
 
-  cp -r "$CACHE_DIR/other/zram/lz4k/include/linux/"* ./include/linux/
-  cp -r "$CACHE_DIR/other/zram/lz4k/lib/"* ./lib/
-  cp -r "$CACHE_DIR/other/zram/lz4k/crypto/"* ./crypto/
-  cp "$CACHE_DIR/other/zram/zram_patch/6.6/lz4kd.patch" ./
+  cp -r "$SUKI_CACHE_DIR/other/zram/lz4k/include/linux/"* ./include/linux/
+  cp -r "$SUKI_CACHE_DIR/other/zram/lz4k/lib/"* ./lib/
+  cp -r "$SUKI_CACHE_DIR/other/zram/lz4k/crypto/"* ./crypto/
+  cp "$SUKI_CACHE_DIR/other/zram/zram_patch/6.6/lz4kd.patch" ./
   patch -p1 -F 3 < lz4kd.patch || true
 
   if [ -f crypto/lz4kd.c ] && [ -f lib/lz4kd/lz4kd_decode.c ] && grep -q 'lz4kd' crypto/Makefile && grep -q 'lz4kd' lib/Makefile; then
@@ -225,11 +234,6 @@ fi
 
 # ===== 风驰引擎及优化补丁批 =====
 cd "$GITHUB_WORKSPACE/kernel_workspace"
-
-info "获取 Wild 补丁仓..."
-WILD_DIR="$HOME/.cache_patches/wild_patches"
-mkdir -p "$HOME/.cache_patches"
-sync_repo "https://github.com/WildKernels/kernel_patches.git" "$WILD_DIR"
 
 # 优先 oneplus/hmbird，未命中全仓搜索（上游目录可能变动）
 PATCH_FILE=$(find_latest "$WILD_DIR/oneplus/hmbird/" "fengchi_OP13_*.patch")
