@@ -63,41 +63,23 @@ AOSP_TAG_PID=$!
 if [ -d "common/.git" ]; then
   info "common 源码已存在，reset到OEM"
   cd common
-  OEM_FETCH_OK=0
-  for i in 1 2 3; do
-    glr fetch --depth=1 origin "$OEM_BRANCH" && OEM_FETCH_OK=1 && break
-    warn "OEM fetch 失败(第${i}次)，5 秒后重试..."
-    sleep 5
-  done
-  [[ "$OEM_FETCH_OK" -eq 1 ]] || { error "OEM fetch 3 次均失败，中止构建"; exit 1; }
+  retry "OEM fetch" 3 5 glr fetch --depth=1 origin "$OEM_BRANCH" || die "OEM fetch 3 次均失败，中止构建"
   git reset --hard FETCH_HEAD
   git clean -fd -e /out/
   cd ..
 else
   rm -rf common
   info "首次克隆 OEM 内核源码仓库..."
-  for i in 1 2 3; do
-    glr clone --depth=1 \
-      https://github.com/OnePlusOSS/android_kernel_common_oneplus_sm8750.git \
-      -b "$OEM_BRANCH" \
-      common && break
-    rm -rf common
-    warn "OEM 内核仓库克隆失败(第${i}次)，5 秒后重试..."
-    sleep 5
-  done
-  [[ -d common/.git ]] || { error "OEM 克隆 3 次均失败，中止构建"; exit 1; }
+  retry "OEM 克隆" 3 5 glr clone --depth=1 \
+    https://github.com/OnePlusOSS/android_kernel_common_oneplus_sm8750.git \
+    -b "$OEM_BRANCH" \
+    common || die "OEM 克隆 3 次均失败，中止构建"
 fi
 
 if [ -d "vendor_modules/.git" ]; then
   info "vendor_modules 已存在，仅更新（后台并行）..."
   ( cd vendor_modules && {
-      VM_FETCH_OK=0
-      for i in 1 2 3; do
-        glr fetch --depth=1 origin "$OEM_BRANCH" && VM_FETCH_OK=1 && break
-        warn "vendor_modules fetch 失败(第${i}次)，5 秒后重试..."
-        sleep 5
-      done
-      [[ "$VM_FETCH_OK" -eq 1 ]] || exit 1
+      retry "vendor_modules fetch" 3 5 glr fetch --depth=1 origin "$OEM_BRANCH" || exit 1
       git reset --hard FETCH_HEAD
       git clean -fd -e /out/
     }
@@ -106,16 +88,10 @@ if [ -d "vendor_modules/.git" ]; then
 else
   rm -rf vendor_modules
   info "首次克隆设备树与私有驱动仓库（后台并行）..."
-  ( for i in 1 2 3; do
-        glr clone --depth=1 \
-          https://github.com/OnePlusOSS/android_kernel_modules_and_devicetree_oneplus_sm8750.git \
-          -b "$OEM_BRANCH" \
-          vendor_modules && break
-        rm -rf vendor_modules
-        warn "vendor_modules 克隆失败(第${i}次)，5 秒后重试..."
-        sleep 5
-      done
-      [[ -d vendor_modules/.git ]] || exit 1
+  ( retry "vendor_modules 克隆" 3 5 glr clone --depth=1 \
+      https://github.com/OnePlusOSS/android_kernel_modules_and_devicetree_oneplus_sm8750.git \
+      -b "$OEM_BRANCH" \
+      vendor_modules || exit 1
   ) &
   VENDOR_PID=$!
 fi
@@ -247,8 +223,6 @@ if [[ "$RUNNER_TYPE" == "ubuntu-latest" ]]; then
 fi
 rm -f common/android/abi_gki_protected_exports_* || true
 sed -i 's/protected_modules = \[.*\]/protected_modules = []/' common/modules.bzl || true
-for f in common/scripts/setlocalversion; do
-  sed -i 's/ -dirty//g' "$f"
-  sed -i '$i res=$(echo "$res" | sed '\''s/-dirty//g'\'')' "$f"
-done
+sed -i 's/ -dirty//g' common/scripts/setlocalversion
+sed -i '$i res=$(echo "$res" | sed '\''s/-dirty//g'\'')' common/scripts/setlocalversion
 info "源码及工具链初始化完成"

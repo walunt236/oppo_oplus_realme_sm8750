@@ -39,32 +39,18 @@ fi
 
 # ===== AnyKernel3 打包 =====
 cd kernel_workspace
-CLONE_OK=0
 if [ -d AnyKernel3/.git ]; then
   info "AnyKernel3 仓库已存在，增量同步..."
   # 旧缓存 origin 是 cctv18，纠正为官方 fork（walunt236）
   git -C AnyKernel3 remote set-url origin https://github.com/walunt236/AnyKernel3 2>/dev/null || true
   if glr fetch -C AnyKernel3 --depth=1 origin && git -C AnyKernel3 reset --hard FETCH_HEAD; then
-    CLONE_OK=1
+    :
   else
     warn "AnyKernel3 增量拉取失败，使用本地已有版本"
-    CLONE_OK=1
   fi
-fi
-if [[ $CLONE_OK -ne 1 ]]; then
+else
   rm -rf AnyKernel3
-  for i in 1 2 3 4 5 6 7 8; do
-    if glr clone https://github.com/walunt236/AnyKernel3 --depth=1 AnyKernel3; then
-      CLONE_OK=1
-      break
-    fi
-    warn "AnyKernel3 克隆失败(第${i}次)，5 秒后重试..."
-    sleep 5
-  done
-fi
-if [[ $CLONE_OK -ne 1 ]]; then
-  error "AnyKernel3 克隆失败，终止打包"
-  exit 1
+  retry "AnyKernel3 克隆" 8 5 glr clone https://github.com/walunt236/AnyKernel3 --depth=1 AnyKernel3 || die "AnyKernel3 克隆失败，终止打包"
 fi
 # zip 用 ./* 通配符，.git 不打包但保留供下次增量拉取
 cd AnyKernel3
@@ -115,28 +101,28 @@ BUILD_DATE="$(TZ=Asia/Shanghai date +%Y%m%d)"
 AK3_NAME="AnyKernel3-${KSU_TYPENAME}-${KSUVER}-${KERNEL_VERSION_FULL}-${KERNEL_SUFFIX}-${BUILD_DATE}.zip"
 FULL_VERSION="${KERNEL_VERSION_FULL}-${KERNEL_SUFFIX}"
 TIME_NOW="$(TZ='Asia/Shanghai' date +'%Y-%m-%d %H:%M:%S')"
-{
-  echo "Author: $GITHUB_ACTOR"
-  echo "Repo: $GITHUB_REPOSITORY"
-  echo "Branch: $GITHUB_REF_NAME"
-  echo "Run ID: $GITHUB_RUN_ID"
-  echo "Commit: $GITHUB_SHA"
-  echo "Time: $TIME_NOW"
-  echo "Kernel Ver: $FULL_VERSION"
-  echo "KSU Branch: ${KSU_TYPENAME}"
-  echo "KSU Ver: ${KSUVER}"
-  echo "susfs: $SUSFS_ENABLE"
-  echo "KPM: $KPM_ENABLE"
-  echo "LZ4: on"
-  echo "LZ4KD: $LZ4KD_ENABLE"
-  echo "IPset: on"
-  echo "BBRv3: on"
-  echo "Droidspaces: $DROIDSPACES_ENABLE"
-  echo "ADIOS: on"
-  echo "Re-Kernel: $REKERNEL_ENABLE"
-  echo "BBG: $BASEBAND_GUARD"
-  echo "RCU_NOCB: $RCU_NOCB_ENABLE"
-} > ./ak3.log
+cat > ./ak3.log << EOF
+Author: $GITHUB_ACTOR
+Repo: $GITHUB_REPOSITORY
+Branch: $GITHUB_REF_NAME
+Run ID: $GITHUB_RUN_ID
+Commit: $GITHUB_SHA
+Time: $TIME_NOW
+Kernel Ver: $FULL_VERSION
+KSU Branch: ${KSU_TYPENAME}
+KSU Ver: ${KSUVER}
+susfs: $SUSFS_ENABLE
+KPM: $KPM_ENABLE
+LZ4: on
+LZ4KD: $LZ4KD_ENABLE
+IPset: on
+BBRv3: on
+Droidspaces: $DROIDSPACES_ENABLE
+ADIOS: on
+Re-Kernel: $REKERNEL_ENABLE
+BBG: $BASEBAND_GUARD
+RCU_NOCB: $RCU_NOCB_ENABLE
+EOF
 
 zip -r "../$AK3_NAME" ./*
 echo "ak3name=$AK3_NAME" >> "$GITHUB_OUTPUT"

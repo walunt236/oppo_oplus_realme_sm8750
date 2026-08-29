@@ -20,6 +20,16 @@ sync_repo() {
   fi
 }
 
+link_ksu_kernel() {
+  ln -sf "$(realpath --relative-to=common/drivers "$PWD/$1/kernel")" common/drivers/kernelsu
+  grep -q "kernelsu" common/drivers/Makefile || printf "\nobj-\$(CONFIG_KSU) += kernelsu/\n" >> common/drivers/Makefile
+  grep -q "drivers/kernelsu/Kconfig" common/drivers/Kconfig || sed -i "/endmenu/i\source \"drivers/kernelsu/Kconfig\"" common/drivers/Kconfig
+}
+
+ksu_commit_count() {
+  curl -sI --retry 3 --retry-delay 5 "https://api.github.com/repos/$1/commits?sha=$2&per_page=1" | grep -i "link:" | sed -n 's/.*page=\([0-9]*\)>; rel="last".*/\1/p' || true
+}
+
 # ============ KernelSU ============
 rm -rf common/drivers/kernelsu
 
@@ -36,9 +46,7 @@ if [[ "$KSU_TYPE" == "sukisu" || "$KSU_TYPE" == "resukisu" ]]; then
     rm -rf KernelSU
     glr clone -b main https://github.com/ReSukiSU/ReSukiSU.git KernelSU
   fi
-  ln -sf "$(realpath --relative-to=common/drivers "$PWD/KernelSU/kernel")" common/drivers/kernelsu
-  grep -q "kernelsu" common/drivers/Makefile || printf "\nobj-\$(CONFIG_KSU) += kernelsu/\n" >> common/drivers/Makefile
-  grep -q "drivers/kernelsu/Kconfig" common/drivers/Kconfig || sed -i "/endmenu/i\source \"drivers/kernelsu/Kconfig\"" common/drivers/Kconfig
+  link_ksu_kernel KernelSU
   echo 'CONFIG_KSU_FULL_NAME_FORMAT="%TAG_NAME%-%COMMIT_SHA%@walunt236"' >> ./common/arch/arm64/configs/gki_defconfig
   cd ./KernelSU
   KSU_VERSION=$(expr $(git rev-list --count main) + 30700 2>/dev/null || echo 0)
@@ -60,11 +68,9 @@ elif [[ "$KSU_TYPE" == "ksunext" ]]; then
     rm -rf KernelSU-Next
     glr clone -b dev-susfs https://github.com/pershoot/KernelSU-Next.git KernelSU-Next
   fi
-  ln -sf "$(realpath --relative-to=common/drivers "$PWD/KernelSU-Next/kernel")" common/drivers/kernelsu
-  grep -q "kernelsu" common/drivers/Makefile || printf "\nobj-\$(CONFIG_KSU) += kernelsu/\n" >> common/drivers/Makefile
-  grep -q "drivers/kernelsu/Kconfig" common/drivers/Kconfig || sed -i "/endmenu/i\source \"drivers/kernelsu/Kconfig\"" common/drivers/Kconfig
+  link_ksu_kernel KernelSU-Next
   cd KernelSU-Next
-  KSU_COMMITS=$(curl -sI --retry 3 --retry-delay 5 "https://api.github.com/repos/pershoot/KernelSU-Next/commits?sha=dev&per_page=1" | grep -i "link:" | sed -n 's/.*page=\([0-9]*\)>; rel="last".*/\1/p' || true)
+  KSU_COMMITS=$(ksu_commit_count pershoot/KernelSU-Next dev)
   KSU_COMMITS=${KSU_COMMITS:-0}
   if [[ "$KSU_COMMITS" == "0" ]]; then
     warn "KernelSU-Next 提交数获取失败，版本号降级为基线"
@@ -91,9 +97,7 @@ elif [[ "$KSU_TYPE" == "ksu" ]]; then
     rm -rf KernelSU
     glr clone -b main https://github.com/tiann/KernelSU.git KernelSU
   fi
-  ln -sf "$(realpath --relative-to=common/drivers "$PWD/KernelSU/kernel")" common/drivers/kernelsu
-  grep -q "kernelsu" common/drivers/Makefile || printf "\nobj-\$(CONFIG_KSU) += kernelsu/\n" >> common/drivers/Makefile
-  grep -q "drivers/kernelsu/Kconfig" common/drivers/Kconfig || sed -i "/endmenu/i\source \"drivers/kernelsu/Kconfig\"" common/drivers/Kconfig
+  link_ksu_kernel KernelSU
   cd ./KernelSU
   KSU_COMMITS=$(curl -sI --retry 3 --retry-delay 5 "https://api.github.com/repos/tiann/KernelSU/commits?sha=main&per_page=1" | grep -i "link:" | sed -n 's/.*page=\([0-9]*\)>; rel="last".*/\1/p' || true)
   KSU_COMMITS=${KSU_COMMITS:-0}
@@ -177,13 +181,8 @@ mkdir -p "$ACCEL_DIR"
 # 固定 6.6.142 分支（与 AOSP merge 基线一致，防 API 漂移）
 PALAZIK_BRANCH="6.6.142_oneplus13_coloros16"
 info "lz4accel 上游分支: $PALAZIK_BRANCH"
-curl -fsSL --retry 3 --retry-delay 5 -H "Authorization: token $GH_TOKEN" \
-  "https://api.github.com/repos/palazik/android_kernel_common_oneplus_sm8750/contents/fs/f2fs/lz4armv8/lz4accel.c?ref=$PALAZIK_BRANCH" | \
-  python3 -c "import sys,json,base64;open('$ACCEL_DIR/lz4accel.c','wb').write(base64.b64decode(json.load(sys.stdin)['content']))" || warn "lz4accel.c 拉取失败，保留缓存/继续..."
-curl -fsSL --retry 3 --retry-delay 5 -H "Authorization: token $GH_TOKEN" \
-  "https://api.github.com/repos/palazik/android_kernel_common_oneplus_sm8750/contents/fs/f2fs/lz4armv8/lz4accel.h?ref=$PALAZIK_BRANCH" | \
-  python3 -c "import sys,json,base64;open('$ACCEL_DIR/lz4accel.h','wb').write(base64.b64decode(json.load(sys.stdin)['content']))" || warn "lz4accel.h 拉取失败，保留缓存/继续..."
-mkdir -p fs/f2fs/lz4armv8
+fetch_gh_file "palazik/android_kernel_common_oneplus_sm8750" "fs/f2fs/lz4armv8/lz4accel.c" "$PALAZIK_BRANCH" "$ACCEL_DIR/lz4accel.c" || warn "lz4accel.c 拉取失败，保留缓存/继续..."
+fetch_gh_file "palazik/android_kernel_common_oneplus_sm8750" "fs/f2fs/lz4armv8/lz4accel.h" "$PALAZIK_BRANCH" "$ACCEL_DIR/lz4accel.h" || warn "lz4accel.h 拉取失败，保留缓存/继续..."mkdir -p fs/f2fs/lz4armv8
 cp "$ACCEL_DIR/lz4accel.c" fs/f2fs/lz4armv8/
 cp "$ACCEL_DIR/lz4accel.h" fs/f2fs/lz4armv8/
 
@@ -228,10 +227,10 @@ mkdir -p "$HOME/.cache_patches"
 sync_repo "https://github.com/WildKernels/kernel_patches.git" "$WILD_DIR"
 
 # 优先 oneplus/hmbird，未命中全仓搜索（上游目录可能变动）
-PATCH_FILE=$(find "$WILD_DIR/oneplus/hmbird/" -maxdepth 1 -name "fengchi_OP13_*.patch" 2>/dev/null | sort | tail -n 1 || true)
+PATCH_FILE=$(find_latest "$WILD_DIR/oneplus/hmbird/" "fengchi_OP13_*.patch")
 if [ -z "$PATCH_FILE" ]; then
   warn "oneplus/hmbird 目录未找到风驰补丁，开始全仓搜索..."
-  PATCH_FILE=$(find "$WILD_DIR" -type f -name "fengchi_OP13_*.patch" 2>/dev/null | sort | tail -n 1 || true)
+  PATCH_FILE=$(find_latest "$WILD_DIR" "fengchi_OP13_*.patch")
 fi
 if [ -z "$PATCH_FILE" ]; then
   error "未匹配到一加13风驰补丁"
@@ -262,10 +261,10 @@ fi
 find . -name "*.rej" -delete 2>/dev/null
 
 info "注入 Overwriter 补丁..."
-OVERWRITER_PATCH=$(find "$WILD_DIR/oneplus/hmbird/" -maxdepth 1 -name "overwriter.patch" 2>/dev/null | sort | tail -n 1 || true)
+OVERWRITER_PATCH=$(find_latest "$WILD_DIR/oneplus/hmbird/" "overwriter.patch")
 if [ -z "$OVERWRITER_PATCH" ]; then
   warn "oneplus/hmbird 未找到 overwriter.patch，开始全仓搜索..."
-  OVERWRITER_PATCH=$(find "$WILD_DIR" -type f -name "overwriter.patch" 2>/dev/null | sort | tail -n 1 || true)
+  OVERWRITER_PATCH=$(find_latest "$WILD_DIR" "overwriter.patch")
 fi
 if [ -z "$OVERWRITER_PATCH" ]; then
   error "Overwriter 补丁未找到"
@@ -282,10 +281,10 @@ if [ -f "./drivers/of/overwriter/overwrite_configs/convert_configs.sh" ]; then
 fi
 
 info "固化 Hmbird Defconfig..."
-HMBIRD_CFG=$(find "$WILD_DIR/oneplus/hmbird/" -maxdepth 1 -name "hmbird_config.patch" 2>/dev/null | sort | tail -n 1 || true)
+HMBIRD_CFG=$(find_latest "$WILD_DIR/oneplus/hmbird/" "hmbird_config.patch")
 if [ -z "$HMBIRD_CFG" ]; then
   warn "oneplus/hmbird 未找到 hmbird_config.patch，开始全仓搜索..."
-  HMBIRD_CFG=$(find "$WILD_DIR" -type f -name "hmbird_config.patch" 2>/dev/null | sort | tail -n 1 || true)
+  HMBIRD_CFG=$(find_latest "$WILD_DIR" "hmbird_config.patch")
 fi
 if [ -z "$HMBIRD_CFG" ]; then
   error "Hmbird Defconfig 补丁未找到"
@@ -297,31 +296,13 @@ patch -p1 -F 3 -f < "$HMBIRD_CFG" || {
   exit 1
 }
 
-patch -p1 --forward -f < "$WILD_DIR/common/optimized_mem_operations.patch" || warn "optimized_mem_operations.patch 应用失败，继续..."
-patch -p1 --forward -f < "$WILD_DIR/common/file_struct_8bytes_align.patch" || warn "file_struct_8bytes_align.patch 应用失败，继续..."
-patch -p1 --forward -f < "$WILD_DIR/common/reduce_cache_pressure.patch" || warn "reduce_cache_pressure.patch 应用失败，继续..."
-patch -p1 --forward -f < "$WILD_DIR/common/mem_opt_prefetch.patch" || warn "mem_opt_prefetch.patch 应用失败，继续..."
-patch -p1 --forward -f < "$WILD_DIR/common/optimise_memcmp.patch" || warn "optimise_memcmp.patch 应用失败，继续..."
-
-patch -p1 --forward -f < "$WILD_DIR/common/f2fs_reduce_congestion.patch" || warn "f2fs_reduce_congestion.patch 应用失败，继续..."
-patch -p1 --forward -f < "$WILD_DIR/common/f2fs_enlarge_min_fsync_blocks.patch" || warn "f2fs_enlarge_min_fsync_blocks.patch 应用失败，继续..."
-patch -p1 --forward -f < "$WILD_DIR/common/increase_ext4_default_commit_age.patch" || warn "increase_ext4_default_commit_age.patch 应用失败，继续..."
-
-patch -p1 --forward -f < "$WILD_DIR/common/int_sqrt.patch" || warn "int_sqrt.patch 应用失败，继续..."
-patch -p1 --forward -f < "$WILD_DIR/common/reduce_gc_thread_sleep_time.patch" || warn "reduce_gc_thread_sleep_time.patch 应用失败，继续..."
-patch -p1 --forward -f < "$WILD_DIR/common/increase_sk_mem_packets.patch" || warn "increase_sk_mem_packets.patch 应用失败，继续..."
-patch -p1 --forward -f < "$WILD_DIR/common/disable_cache_hot_buddy.patch" || warn "disable_cache_hot_buddy.patch 应用失败，继续..."
-patch -p1 --forward -f < "$WILD_DIR/common/force_tcp_nodelay.patch" || warn "force_tcp_nodelay.patch 应用失败，继续..."
-patch -p1 --forward -f < "$WILD_DIR/common/minimise_wakeup_time.patch" || warn "minimise_wakeup_time.patch 应用失败，继续..."
-patch -p1 --forward -f < "$WILD_DIR/common/reduce_freeze_timeout.patch" || warn "reduce_freeze_timeout.patch 应用失败，继续..."
-patch -p1 --forward -f < "$WILD_DIR/common/silence_irq_cpu_logspam.patch" || warn "silence_irq_cpu_logspam.patch 应用失败，继续..."
-patch -p1 --forward -f < "$WILD_DIR/common/silence_system_logspam.patch" || warn "silence_system_logspam.patch 应用失败，继续..."
+for p in optimized_mem_operations file_struct_8bytes_align reduce_cache_pressure mem_opt_prefetch optimise_memcmp f2fs_reduce_congestion f2fs_enlarge_min_fsync_blocks increase_ext4_default_commit_age int_sqrt reduce_gc_thread_sleep_time increase_sk_mem_packets disable_cache_hot_buddy force_tcp_nodelay minimise_wakeup_time reduce_freeze_timeout silence_irq_cpu_logspam silence_system_logspam; do
+  patch -p1 --forward -f < "$WILD_DIR/common/$p.patch" || warn "$p.patch 应用失败，继续..."
+done
 if [ -f "$HOME/.cache_patches/zram_patches/common/EnablePOLLY.patch" ]; then
   patch -p1 --forward -f < "$HOME/.cache_patches/zram_patches/common/EnablePOLLY.patch" || warn "EnablePOLLY.patch 应用失败，继续..."
 else
-  curl -fsSL --retry 3 --retry-delay 5 -H "Authorization: token ${GH_TOKEN:-}" \
-    "https://api.github.com/repos/mrcxlinux/kernel_patches/contents/common/EnablePOLLY.patch?ref=main" | \
-    python3 -c "import sys,json,base64;open('/tmp/EnablePOLLY.patch','wb').write(base64.b64decode(json.load(sys.stdin)['content']))" || warn "EnablePOLLY.patch 下载失败，继续..."
+  fetch_gh_file "mrcxlinux/kernel_patches" "common/EnablePOLLY.patch" "main" "/tmp/EnablePOLLY.patch" || warn "EnablePOLLY.patch 下载失败，继续..."
   patch -p1 --forward -f < /tmp/EnablePOLLY.patch || warn "EnablePOLLY.patch 应用失败，继续..."
 fi
 curl -fSL --retry 3 --retry-delay 5 --retry-all-errors -o /tmp/mm_zsmalloc.patch "https://github.com/brokestar233/android_kernel_common_oneplus_sm8750/commit/d831954.patch"
@@ -374,7 +355,7 @@ TOTAL_REJ=$((TOTAL_REJ + BATCH_REJ))
 info "Palazik 补丁 reject: $BATCH_REJ"
 find . -name "*.rej" -delete 2>/dev/null
 
-UNICODE_PATCH=$(find "$WILD_DIR/" -name "*unicode*.patch" | sort | tail -n 1 || true)
+UNICODE_PATCH=$(find_latest "$WILD_DIR/" "*unicode*.patch")
 if [ -n "$UNICODE_PATCH" ]; then
   info "匹配到 Unicode 防检测路径补丁: $UNICODE_PATCH"
   sed -i 's/\r$//' "$UNICODE_PATCH"
@@ -467,9 +448,7 @@ fi
 # ===== BBRv3 =====
 info "应用 BBRv3 补丁..."
 cd "$GITHUB_WORKSPACE/kernel_workspace/common"
-curl -fsSL --retry 3 --retry-delay 5 -H "Authorization: token $GH_TOKEN" \
-  "https://api.github.com/repos/WildKernels/kernel_patches/contents/common/bbrv3/0001-net-tcp-backport-BBRv3-to-android15-6.6.patch?ref=main" | \
-  python3 -c "import sys,json,base64;open('bbrv3.patch','wb').write(base64.b64decode(json.load(sys.stdin)['content']))"
+fetch_gh_file "WildKernels/kernel_patches" "common/bbrv3/0001-net-tcp-backport-BBRv3-to-android15-6.6.patch" "main" "bbrv3.patch"
 
 if git apply -p1 < bbrv3.patch 2>/dev/null; then
   info "BBRv3 git apply 成功"

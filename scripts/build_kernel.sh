@@ -21,12 +21,20 @@ fi
 
 # ===== 构建内核配置 =====
 cd "$GITHUB_WORKSPACE/kernel_workspace/common"
-CLANG_DIR_NAME="Clang-19.0.0git-20240723"
 
-# PATH 加载顺序：build-tools -> Clang19 -> ccache
-export PATH="$HOME/.toolchains/${BT_DIR_NAME:?}/build-tools/bin:$PATH"
-export PATH="$HOME/.toolchains/$CLANG_DIR_NAME/bin:$PATH"
-export PATH="/usr/lib/ccache:$PATH"
+load_toolchain_env() {
+  export PATH="$HOME/.toolchains/${BT_DIR_NAME:?}/build-tools/bin:$PATH"
+  export PATH="$HOME/.toolchains/Clang-19.0.0git-20240723/bin:$PATH"
+  export PATH="/usr/lib/ccache:$PATH"
+}
+
+assert_config() {
+  local sym="$1" desc="${2:-$1}"
+  grep -q "^${sym}=y" out/.config || die "配置未生效: ${sym}，中止构建"
+  info "${desc} 配置生效"
+}
+
+load_toolchain_env
 
 # 默认增量；clean_build=true 强制全量
 if [[ "$CLEAN_BUILD" == "true" ]]; then
@@ -67,52 +75,13 @@ if [ -f out/.config ]; then
 fi
 
 # AutoFDO 默认开启：.config 校验（缺失即停摆）
-if grep -q '^CONFIG_AUTOFDO_CLANG=y' out/.config; then
-  info "AUTOFDO_CLANG 配置生效 (AutoFDO 优化开启)"
-else
-  error "AUTOFDO_CLANG 配置未生效，中止构建"
-  exit 1
-fi
-if grep -q '^CONFIG_SECTION_MISMATCH_WARN_ONLY=y' out/.config; then
-  info "SECTION_MISMATCH_WARN_ONLY 配置生效 (modpost mismatch 降级警告)"
-else
-  error "SECTION_MISMATCH_WARN_ONLY 配置未生效，中止构建"
-  exit 1
-fi
-if grep -q '^CONFIG_LTO_CLANG_THIN=y' out/.config; then
-  info "LTO_CLANG_THIN 配置生效 (ThinLTO——--lto-sample-profile 链接期二次应用前提)"
-else
-  error "LTO_CLANG_THIN 未生效，--lto-sample-profile 无法应用"
-  exit 1
-fi
-# HZ=300 默认开启校验
-if grep -q '^CONFIG_HZ_300=y' out/.config; then
-  info "HZ_300 配置生效"
-else
-  error "HZ_300 配置未生效，中止构建"
-  exit 1
-fi
-# 网络功能默认开启校验（ipset 为网络扩展标志项）
-if grep -q '^CONFIG_IP_SET=y' out/.config; then
-  info "网络功能扩展配置生效 (IP_SET)"
-else
-  error "网络功能扩展配置未生效 (IP_SET 缺失)，中止构建"
-  exit 1
-fi
-# ADIOS 默认开启校验
-if grep -q '^CONFIG_MQ_IOSCHED_ADIOS=y' out/.config; then
-  info "ADIOS 配置生效"
-else
-  error "ADIOS 配置未生效，中止构建"
-  exit 1
-fi
-# BBRv3 默认开启校验
-if grep -q '^CONFIG_TCP_CONG_BBR3=y' out/.config; then
-  info "BBRv3 配置生效"
-else
-  error "BBRv3 配置未生效，中止构建"
-  exit 1
-fi
+assert_config CONFIG_AUTOFDO_CLANG "AutoFDO (AUTOFDO_CLANG)"
+assert_config CONFIG_SECTION_MISMATCH_WARN_ONLY "SECTION_MISMATCH_WARN_ONLY (modpost mismatch 降级警告)"
+assert_config CONFIG_LTO_CLANG_THIN "ThinLTO"
+assert_config CONFIG_HZ_300 "HZ=300"
+assert_config CONFIG_IP_SET "网络功能扩展 (IP_SET)"
+assert_config CONFIG_MQ_IOSCHED_ADIOS "ADIOS"
+assert_config CONFIG_TCP_CONG_BBR3 "BBRv3"
 
 if grep -q '^CONFIG_LLVM_POLLY=y' out/.config; then
   info "LLVM POLLY 配置生效"
@@ -153,11 +122,8 @@ if [[ "$DIAGNOSIS" == "true" ]]; then
 fi
 
 cd "$GITHUB_WORKSPACE"
-CLANG_DIR_NAME="Clang-19.0.0git-20240723"
 
-export PATH="$HOME/.toolchains/${BT_DIR_NAME:?}/build-tools/bin:$PATH"
-export PATH="$HOME/.toolchains/$CLANG_DIR_NAME/bin:$PATH"
-export PATH="/usr/lib/ccache:$PATH"
+load_toolchain_env
 
 cd kernel_workspace/common
 
@@ -285,26 +251,17 @@ fi
 # AutoFDO：-fprofile-sample-use + --lto-sample-profile；sample-accurate + 传播迭代 300
 make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" LD="$(pwd)/ld-wrapper" HOSTLD=ld.lld O=out KCFLAGS="-O3 -Wno-error $KCFLAGS_EXTRA -fprofile-sample-accurate -mllvm -sample-profile-max-propagate-iterations=300" CLANG_AUTOFDO_PROFILE="$AFDO_PROFILE" Image
 # 校验 Image 内嵌配置（IKCFG）与 .config 一致
+assert_ikcfg() {
+  grep -q "^${1}=y" <<< "$IKCFG_TEXT" || die "Image 内嵌配置缺少 ${1}，产物配置陈旧，中止"
+}
 if [ -f out/arch/arm64/boot/Image ] && strings -a out/arch/arm64/boot/Image | grep -qa "IKCFG_ST"; then
   IKCFG_TEXT=$(perl -e 'open(F,"<",$ARGV[0]); local $/; $d=<F>; close F; $d =~ /IKCFG_ST(.*?)IKCFG_ED/s; open(G,"|-","gzip -dc 2>/dev/null"); print G $1; close G;' out/arch/arm64/boot/Image 2>/dev/null)
-  if grep -q '^CONFIG_ZRAM_MEMORY_TRACKING=y' <<< "$IKCFG_TEXT"; then
-    info "Image 内嵌配置校验通过 (ZRAM_MEMORY_TRACKING=y)"
-  else
-    error "Image 内嵌配置缺少 ZRAM_MEMORY_TRACKING，产物配置陈旧，中止"
-    exit 1
-  fi
-  # 产物级 FDO 校验：Image 内嵌配置必须含 AUTOFDO_CLANG（防 .config 假阳性/编译期失效）
-  if grep -q '^CONFIG_AUTOFDO_CLANG=y' <<< "$IKCFG_TEXT"; then
-    info "Image 内嵌配置校验通过 (AUTOFDO_CLANG=y——FDO 编译确认)"
-  else
-    error "Image 内嵌配置缺少 AUTOFDO_CLANG，FDO 未实际生效，中止"
-    exit 1
-  fi
-  # 默认开启三件套产物级断言（防注入被后续改动静默丢弃）
-  for cfg in CONFIG_HZ_300 CONFIG_TCP_CONG_BBR3 CONFIG_IP_SET; do
-    grep -q "^$cfg=y" <<< "$IKCFG_TEXT" || { error "Image 内嵌配置缺少 $cfg，产物配置陈旧，中止"; exit 1; }
-  done
-  info "Image 内嵌配置校验通过 (HZ_300/BBR3/IP_SET)"
+  assert_ikcfg CONFIG_ZRAM_MEMORY_TRACKING
+  assert_ikcfg CONFIG_AUTOFDO_CLANG
+  assert_ikcfg CONFIG_HZ_300
+  assert_ikcfg CONFIG_TCP_CONG_BBR3
+  assert_ikcfg CONFIG_IP_SET
+  info "Image 内嵌配置校验通过 (ZRAM_MEMORY_TRACKING/AUTOFDO_CLANG/HZ_300/BBR3/IP_SET)"
 fi
 
 info "内核镜像编译完成"

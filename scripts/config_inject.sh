@@ -117,10 +117,10 @@ if [[ "$RCU_NOCB_ENABLE" == "true" ]]; then
 CONFIG_RCU_EXPERT=y
 CONFIG_RCU_NOCB_CPU=y
 CONFIG_RCU_NOCB_CPU_DEFAULT_ALL=y
+CONFIG_RCU_LAZY_DEFAULT_OFF=n
+CONFIG_RCU_NOCB_CPU_CB_BOOST=y
 RCUCFG
-  echo 'CONFIG_RCU_LAZY_DEFAULT_OFF=n' >> ./common/arch/arm64/configs/gki_defconfig
   info "RCU_LAZY 默认启用"
-  echo 'CONFIG_RCU_NOCB_CPU_CB_BOOST=y' >> ./common/arch/arm64/configs/gki_defconfig
 fi
 
 cat >> "$DCFG" << 'NSCFG'
