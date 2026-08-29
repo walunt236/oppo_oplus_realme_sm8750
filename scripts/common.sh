@@ -10,8 +10,8 @@ error() { echo "[ERROR] $*" | tee -a "$LOG_FILE"; }
 die() { error "$*"; exit 1; }
 
 glr() {
-  git -c http.version=HTTP/1.1 "$@" 2>/dev/null ||
-    git -c http.proxy=http://127.0.0.1:7897 -c https.proxy=http://127.0.0.1:7897 -c http.version=HTTP/1.1 "$@"
+  git -c http.version=HTTP/1.1 -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=30 "$@" 2>/dev/null ||
+    git -c http.proxy=http://127.0.0.1:7897 -c https.proxy=http://127.0.0.1:7897 -c http.version=HTTP/1.1 -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=60 "$@"
 }
 
 detect_proxy() {
