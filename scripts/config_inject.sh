@@ -137,21 +137,9 @@ grep -q "CFLAGS_REMOVE_configs.o" ./common/kernel/Makefile || \
   echo 'CFLAGS_REMOVE_configs.o := -flto=thin -fsplit-lto-unit' >> ./common/kernel/Makefile
 
 # zram recomp 算法只能设备创建时固化（用户态无法在 swapon 前介入）
-fetch_repo_file "other_patch/zram_recomp_default.patch" /tmp/zram_recomp.patch
-if ( cd ./common && patch -p1 -F 3 < /tmp/zram_recomp.patch ); then
-  info "zram 默认 zstd 重压缩算法补丁应用成功"
-else
-  error "zram 默认重压缩算法补丁应用失败"
-  exit 1
-fi
+apply_repo_patch "other_patch/zram_recomp_default.patch" /tmp/zram_recomp.patch strict "zram 默认 zstd 重压缩算法补丁"
 # DAMON_RECLAIM min_age 120s -> 30s
-fetch_repo_file "other_patch/damon_reclaim_defaults.patch" /tmp/damon_reclaim.patch
-if ( cd ./common && patch -p1 -F 3 < /tmp/damon_reclaim.patch ); then
-  info "DAMON_RECLAIM 默认参数补丁应用成功"
-else
-  error "DAMON_RECLAIM 默认参数补丁应用失败"
-  exit 1
-fi
+apply_repo_patch "other_patch/damon_reclaim_defaults.patch" /tmp/damon_reclaim.patch strict "DAMON_RECLAIM 默认参数补丁"
 cat >> "$DCFG" << 'OEMDEPENDS'
 CONFIG_UBSAN=y
 CONFIG_UBSAN_TRAP=y

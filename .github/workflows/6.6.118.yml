@@ -99,11 +99,6 @@ jobs:
   build:
     runs-on: ${{ inputs.runner_type }}
     timeout-minutes: 180
-    outputs:
-      ksuver: ${{ steps.ksu_version.outputs.ksuver }}
-      ak3name: ${{ steps.create_zip.outputs.ak3name }}
-      sub_version: ${{ steps.init_env.outputs.sub_version }}
-      kernel_name: ${{ steps.init_env.outputs.kernel_name }}
     permissions:
       actions: write
       contents: write

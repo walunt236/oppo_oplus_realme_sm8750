@@ -37,8 +37,6 @@ jobs:
           sudo apt purge man-db
           sudo apt update
           sudo apt install -y jq
-          type -p gh >/dev/null || sudo apt install -y gh
-          gh auth login --with-token <<< "${{ secrets.GITHUB_TOKEN }}"
           gh --version
 
       - name: 按保留数量清理工作流

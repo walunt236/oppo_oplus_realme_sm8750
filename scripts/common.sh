@@ -48,3 +48,15 @@ fetch_repo_file() { fetch_gh_file "$GITHUB_REPOSITORY" "$1" "$GITHUB_REF_NAME" "
 find_latest() {
   find "$1" -type f -name "$2" 2>/dev/null | sort | tail -n 1 || true
 }
+
+apply_repo_patch() {
+  local repo_path="$1" out="$2" mode="$3" label="$4"
+  fetch_repo_file "$repo_path" "$out"
+  if ( cd ./common && patch -p1 -F 3 < "$out" ); then
+    info "$label 应用成功"
+  elif [[ "$mode" == "strict" ]]; then
+    die "$label 应用失败，中止构建"
+  else
+    warn "$label 应用失败，继续..."
+  fi
+}

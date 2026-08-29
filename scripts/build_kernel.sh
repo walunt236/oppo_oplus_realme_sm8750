@@ -42,7 +42,11 @@ if [[ "$CLEAN_BUILD" == "true" ]]; then
   rm -rf out
 fi
 
-make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" LD="ld.lld" HOSTLD=ld.lld O=out gki_defconfig
+make_defconfig() {
+  make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" LD="ld.lld" HOSTLD=ld.lld O=out gki_defconfig
+}
+
+make_defconfig
 
 # .config 哈希纳入增量判定（新增符号时 kbuild 不会重编依赖文件）
 CFG_HASH=$(md5sum out/.config | cut -d' ' -f1)
@@ -51,7 +55,7 @@ STORED_CFG=$(cut -d'|' -f2 "$HOME/.cache_patches/build_state" 2>/dev/null || tru
 if [[ "$STORED_CFG" != "$CFG_HASH" ]]; then
   info ".config 与上次成功构建不一致，强制全量重建（避免增量配置陈旧）..."
   rm -rf out
-  make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" LD="ld.lld" HOSTLD=ld.lld O=out gki_defconfig
+  make_defconfig
   CFG_HASH=$(md5sum out/.config | cut -d' ' -f1)
   echo "CFG_HASH=$CFG_HASH" >> "$GITHUB_ENV"
 fi
@@ -60,8 +64,7 @@ if [[ "$LZ4KD_ENABLE" == "true" ]] && [ -f out/.config ]; then
   if grep -q '^CONFIG_ZRAM_DEF_COMP_LZ4=y' out/.config && grep -q '^CONFIG_ZRAM_DEF_COMP="lz4"' out/.config; then
     info "ZRAM 主算法配置生效 (lz4 NEON + MULTI_COMP/zstd 双重压缩)"
   else
-    error "LZ4KD 配置未生效，中止构建"
-    exit 1
+    die "LZ4KD 配置未生效，中止构建"
   fi
 fi
 
@@ -69,8 +72,7 @@ if [ -f out/.config ]; then
   if grep -q '^CONFIG_ZRAM_MEMORY_TRACKING=y' out/.config && grep -q '^CONFIG_ZRAM_TRACK_ENTRY_ACTIME=y' out/.config; then
     info "ZRAM_MEMORY_TRACKING 配置生效 (idle 页重压缩可用)"
   else
-    error "ZRAM_MEMORY_TRACKING 配置未生效，中止构建"
-    exit 1
+    die "ZRAM_MEMORY_TRACKING 配置未生效，中止构建"
   fi
 fi
 
@@ -148,7 +150,12 @@ exec ld.lld --thinlto-cache-dir="$HOME/.thinlto-cache" --thinlto-jobs="$(nproc -
 EOF
 chmod +x ld-wrapper
 
-KCFLAGS_EXTRA="-mcpu=oryon-1 -moutline-atomics -fno-math-errno -fno-strict-aliasing -fno-semantic-interposition -mllvm -enable-misched=true -mllvm -import-instr-limit=300 -falign-functions=32 -falign-loops=32 -mllvm -enable-gvn-hoist -mllvm -enable-load-pre -mllvm -polly-opt-outer-coincidence=true -mllvm -inline-threshold=300 -mllvm -inlinehint-threshold=500 -mllvm -enable-loopinterchange=true -mllvm -enable-ipra -mllvm -enable-phi-of-ops -mllvm -enable-dse-partial-store-merging -mllvm -enable-aarch64-lsr-cost-opt -mllvm -enable-aarch64-or-like-select -mllvm -vectorizer-min-trip-count=2 -mllvm -unroll-threshold=300 -mllvm -enable-loop-distribute"
+KCFLAGS_EXTRA="-mcpu=oryon-1 -moutline-atomics -fno-math-errno -fno-strict-aliasing -fno-semantic-interposition"
+KCFLAGS_EXTRA+=" -mllvm -enable-misched=true -mllvm -import-instr-limit=300 -falign-functions=32 -falign-loops=32"
+KCFLAGS_EXTRA+=" -mllvm -enable-gvn-hoist -mllvm -enable-load-pre -mllvm -polly-opt-outer-coincidence=true -mllvm -inline-threshold=300 -mllvm -inlinehint-threshold=500"
+KCFLAGS_EXTRA+=" -mllvm -enable-loopinterchange=true -mllvm -enable-ipra -mllvm -enable-phi-of-ops -mllvm -enable-dse-partial-store-merging"
+KCFLAGS_EXTRA+=" -mllvm -enable-aarch64-lsr-cost-opt -mllvm -enable-aarch64-or-like-select -mllvm -vectorizer-min-trip-count=2"
+KCFLAGS_EXTRA+=" -mllvm -unroll-threshold=300 -mllvm -enable-loop-distribute"
 
 info "核心编译器版本检查："
 clang --version | head -n 1

@@ -20,6 +20,14 @@ sync_repo() {
   fi
 }
 
+count_rejs() {
+  local label="$1" n
+  n=$(find . -name "*.rej" 2>/dev/null | wc -l || true)
+  find . -name "*.rej" -delete 2>/dev/null || true
+  TOTAL_REJ=$((TOTAL_REJ + n))
+  info "$label reject: $n"
+}
+
 link_ksu_kernel() {
   ln -sf "$(realpath --relative-to=common/drivers "$PWD/$1/kernel")" common/drivers/kernelsu
   grep -q "kernelsu" common/drivers/Makefile || printf "\nobj-\$(CONFIG_KSU) += kernelsu/\n" >> common/drivers/Makefile
@@ -99,7 +107,7 @@ elif [[ "$KSU_TYPE" == "ksu" ]]; then
   fi
   link_ksu_kernel KernelSU
   cd ./KernelSU
-  KSU_COMMITS=$(curl -sI --retry 3 --retry-delay 5 "https://api.github.com/repos/tiann/KernelSU/commits?sha=main&per_page=1" | grep -i "link:" | sed -n 's/.*page=\([0-9]*\)>; rel="last".*/\1/p' || true)
+  KSU_COMMITS=$(ksu_commit_count tiann/KernelSU main)
   KSU_COMMITS=${KSU_COMMITS:-0}
   if [[ "$KSU_COMMITS" == "0" ]]; then
     warn "KernelSU 提交数获取失败，版本号降级为基线"
@@ -182,7 +190,8 @@ mkdir -p "$ACCEL_DIR"
 PALAZIK_BRANCH="6.6.142_oneplus13_coloros16"
 info "lz4accel 上游分支: $PALAZIK_BRANCH"
 fetch_gh_file "palazik/android_kernel_common_oneplus_sm8750" "fs/f2fs/lz4armv8/lz4accel.c" "$PALAZIK_BRANCH" "$ACCEL_DIR/lz4accel.c" || warn "lz4accel.c 拉取失败，保留缓存/继续..."
-fetch_gh_file "palazik/android_kernel_common_oneplus_sm8750" "fs/f2fs/lz4armv8/lz4accel.h" "$PALAZIK_BRANCH" "$ACCEL_DIR/lz4accel.h" || warn "lz4accel.h 拉取失败，保留缓存/继续..."mkdir -p fs/f2fs/lz4armv8
+fetch_gh_file "palazik/android_kernel_common_oneplus_sm8750" "fs/f2fs/lz4armv8/lz4accel.h" "$PALAZIK_BRANCH" "$ACCEL_DIR/lz4accel.h" || warn "lz4accel.h 拉取失败，保留缓存/继续..."
+mkdir -p fs/f2fs/lz4armv8
 cp "$ACCEL_DIR/lz4accel.c" fs/f2fs/lz4armv8/
 cp "$ACCEL_DIR/lz4accel.h" fs/f2fs/lz4armv8/
 
@@ -315,10 +324,7 @@ curl -fSL --retry 3 --retry-delay 5 --retry-all-errors -o /tmp/mm_vmpressure.pat
 patch -p1 --forward -f < /tmp/mm_vmpressure.patch || warn "mm_vmpressure 应用失败，继续..."
 
 TOTAL_REJ=0
-BATCH_REJ=$(find . -name "*.rej" 2>/dev/null | wc -l)
-TOTAL_REJ=$((TOTAL_REJ + BATCH_REJ))
-info "风驰批补丁 reject: $BATCH_REJ"
-find . -name "*.rej" -delete 2>/dev/null
+count_rejs "风驰批"
 
 # AOSP 上游补丁批（aosp-mirror commit.patch，纯直连通道；本地缓存化）
 mkdir -p "$HOME/.cache_patches/aosp"
@@ -331,10 +337,7 @@ done
 for hash in 47f80469849a 5fddd8e6a0a7 0a9eef42768c 71bd6942e33f ef0123e95425 7abe312b37cf 6a42fccfc2bc d43ee181a478 5c8ecdcfbfb0 c5d6863c9aba 9eecad532ad3 c7a8aea27b87; do
   patch -p1 --forward -F 3 < "$HOME/.cache_patches/aosp/$hash.patch" 2>/dev/null || warn "aosp/$hash.patch 应用失败，继续..."
 done
-BATCH_REJ=$(find . -name "*.rej" 2>/dev/null | wc -l)
-TOTAL_REJ=$((TOTAL_REJ + BATCH_REJ))
-info "AOSP 补丁 reject: $BATCH_REJ"
-find . -name "*.rej" -delete 2>/dev/null
+count_rejs "AOSP"
 
 # palazik 补丁批（本地缓存化）
 mkdir -p "$HOME/.cache_patches/palazik"
@@ -350,10 +353,7 @@ for hash in e8400a0 a09e19e; do
     warn "palazik/$hash.patch 缺失或为空，跳过"
   fi
 done
-BATCH_REJ=$(find . -name "*.rej" 2>/dev/null | wc -l)
-TOTAL_REJ=$((TOTAL_REJ + BATCH_REJ))
-info "Palazik 补丁 reject: $BATCH_REJ"
-find . -name "*.rej" -delete 2>/dev/null
+count_rejs "Palazik"
 
 UNICODE_PATCH=$(find_latest "$WILD_DIR/" "*unicode*.patch")
 if [ -n "$UNICODE_PATCH" ]; then
@@ -369,10 +369,7 @@ fi
 
 git -C "$GITHUB_WORKSPACE/kernel_workspace/common" checkout -- drivers/dma-buf/dma-buf.c 2>/dev/null || true
 
-BATCH_REJ=$(find . -name "*.rej" 2>/dev/null | wc -l)
-TOTAL_REJ=$((TOTAL_REJ + BATCH_REJ))
-find . -name "*.rej" -delete 2>/dev/null
-info "Unicode/收尾补丁 reject: $BATCH_REJ"
+count_rejs "Unicode/收尾"
 
 if [ "$TOTAL_REJ" -gt 15 ]; then
   error "风驰+优化补丁总计 $TOTAL_REJ 个 reject（>15），请检查补丁兼容性"
@@ -388,36 +385,26 @@ info "风驰引擎补丁注入完成"
 # ============ Droidspaces ============
 if [[ "$DROIDSPACES_ENABLE" != "false" ]]; then
   info "启用 Droidspaces 容器支持..."
-  cd "$GITHUB_WORKSPACE/kernel_workspace/common"
-  fetch_repo_file "droidspaces_patch/fix_sysvipc_kabi_6_7_8.patch" fix_sysvipc_kabi_6_7_8.patch
-  patch -p1 -F 3 < fix_sysvipc_kabi_6_7_8.patch || true
-  fetch_repo_file "droidspaces_patch/fix_oplus_bsp_midas.patch" fix_oplus_bsp_midas.patch
-  patch -p1 -F 3 < fix_oplus_bsp_midas.patch || true
-  fetch_repo_file "droidspaces_patch/ntsync_base.patch" ntsync_base.patch
-  if fetch_repo_file "droidspaces_patch/ntsync_compat_android15-$KERNEL_VERSION.patch" ntsync_compat.patch; then
-    patch -p1 -F 3 < ntsync_base.patch || true
-    patch -p1 -F 3 < ntsync_compat.patch || true
+  cd "$GITHUB_WORKSPACE/kernel_workspace"
+  apply_repo_patch "droidspaces_patch/fix_sysvipc_kabi_6_7_8.patch" /tmp/fix_sysvipc.patch nonstrict "fix_sysvipc_kabi 补丁"
+  apply_repo_patch "droidspaces_patch/fix_oplus_bsp_midas.patch" /tmp/fix_midas.patch nonstrict "fix_oplus_bsp_midas 补丁"
+  fetch_repo_file "droidspaces_patch/ntsync_base.patch" /tmp/ntsync_base.patch
+  if fetch_repo_file "droidspaces_patch/ntsync_compat_android15-$KERNEL_VERSION.patch" /tmp/ntsync_compat.patch; then
+    ( cd ./common && patch -p1 -F 3 < /tmp/ntsync_base.patch ) || true
+    ( cd ./common && patch -p1 -F 3 < /tmp/ntsync_compat.patch ) || true
   else
     warn "ntsync compat 补丁拉取失败，跳过（仅 base 已应用）"
-    patch -p1 -F 3 < ntsync_base.patch || true
+    ( cd ./common && patch -p1 -F 3 < /tmp/ntsync_base.patch ) || true
   fi
   if [[ "$DROIDSPACES_ENABLE" == "extend" ]]; then
-    fetch_repo_file "droidspaces_patch/evdi_drm.patch" evdi_drm.patch
-    patch -p1 -F 3 < evdi_drm.patch || true
+    apply_repo_patch "droidspaces_patch/evdi_drm.patch" /tmp/evdi_drm.patch nonstrict "evdi_drm 补丁"
   fi
 fi
 
 # ===== ADIOS =====
 info "启用 ADIOS I/O 调度器..."
 cd "$GITHUB_WORKSPACE/kernel_workspace"
-# block 4 文件：Kconfig.iosched/Makefile/adios.c/elevator.c（6.6 兼容已验证）
-fetch_repo_file "other_patch/adios/adios_block_only.patch" /tmp/adios.patch
-if ( cd ./common && patch -p1 -F 3 < /tmp/adios.patch ); then
-  info "ADIOS 补丁应用成功"
-else
-  error "ADIOS 补丁应用失败，中止构建"
-  exit 1
-fi
+apply_repo_patch "other_patch/adios/adios_block_only.patch" /tmp/adios.patch strict "ADIOS 补丁"
 
 # ===== Re-Kernel =====
 if [[ "$REKERNEL_ENABLE" == "true" ]]; then
@@ -448,11 +435,11 @@ fi
 # ===== BBRv3 =====
 info "应用 BBRv3 补丁..."
 cd "$GITHUB_WORKSPACE/kernel_workspace/common"
-fetch_gh_file "WildKernels/kernel_patches" "common/bbrv3/0001-net-tcp-backport-BBRv3-to-android15-6.6.patch" "main" "bbrv3.patch"
+fetch_gh_file "WildKernels/kernel_patches" "common/bbrv3/0001-net-tcp-backport-BBRv3-to-android15-6.6.patch" "main" /tmp/bbrv3.patch
 
-if git apply -p1 < bbrv3.patch 2>/dev/null; then
+if git apply -p1 < /tmp/bbrv3.patch 2>/dev/null; then
   info "BBRv3 git apply 成功"
-elif patch -p1 -F 3 < bbrv3.patch 2>/dev/null; then
+elif patch -p1 -F 3 < /tmp/bbrv3.patch 2>/dev/null; then
   info "BBRv3 patch 成功"
 else
   error "BBRv3 补丁失败，中止构建"
