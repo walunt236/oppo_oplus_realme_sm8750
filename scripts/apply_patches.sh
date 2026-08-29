@@ -90,7 +90,7 @@ elif [[ "$KSU_TYPE" == "ksunext" ]]; then
   KSU_GIT_TAG=$(curl -sL --retry 3 --retry-delay 5 --retry-all-errors "https://api.github.com/repos/KernelSU-Next/KernelSU-Next/tags" | grep -o '"name": *"[^"]*"' | head -n 1 | sed 's/"name": "//;s/"//')
   sed -i "s/KSU_VERSION_TAG_FALLBACK := v0.0.1/KSU_VERSION_TAG_FALLBACK := $KSU_GIT_TAG/g" kernel/Kbuild
   cd ../common/drivers/kernelsu
-  curl -fSL --retry 3 --retry-delay 5 --retry-all-errors -o apk_sign.patch "https://github.com/$GITHUB_REPOSITORY/raw/refs/heads/$GITHUB_REF_NAME/other_patch/apk_sign.patch"
+  cp "$GITHUB_WORKSPACE/other_patch/apk_sign.patch" apk_sign.patch
   patch -p2 -N -F 3 < apk_sign.patch || true
 elif [[ "$KSU_TYPE" == "ksu" ]]; then
   info "配置原版 KernelSU..."
@@ -134,12 +134,7 @@ if [[ "$SUSFS_ENABLE" == "true" ]]; then
     rm -rf susfs4ksu
     cp -r "$SUSFS_CACHE_DIR" susfs4ksu
 
-    # 69_hide_stuff.patch 缓存化
-    HIDE_PATCH="$HOME/.cache_patches/69_hide_stuff.patch"
-    if [ ! -f "$HIDE_PATCH" ]; then
-      fetch_repo_file "other_patch/69_hide_stuff.patch" "$HIDE_PATCH"
-    fi
-    cp "$HIDE_PATCH" ./common/69_hide_stuff.patch
+    cp "$GITHUB_WORKSPACE/other_patch/69_hide_stuff.patch" ./common/69_hide_stuff.patch
 
     cp ./susfs4ksu/kernel_patches/50_add_susfs_in_gki-android15-6.6.patch ./common/
     cp ./susfs4ksu/kernel_patches/fs/* ./common/fs/
@@ -189,8 +184,9 @@ mkdir -p "$ACCEL_DIR"
 # 固定 6.6.142 分支（与 AOSP merge 基线一致，防 API 漂移）
 PALAZIK_BRANCH="6.6.142_oneplus13_coloros16"
 info "lz4accel 上游分支: $PALAZIK_BRANCH"
-fetch_gh_file "palazik/android_kernel_common_oneplus_sm8750" "fs/f2fs/lz4armv8/lz4accel.c" "$PALAZIK_BRANCH" "$ACCEL_DIR/lz4accel.c" || warn "lz4accel.c 拉取失败，保留缓存/继续..."
-fetch_gh_file "palazik/android_kernel_common_oneplus_sm8750" "fs/f2fs/lz4armv8/lz4accel.h" "$PALAZIK_BRANCH" "$ACCEL_DIR/lz4accel.h" || warn "lz4accel.h 拉取失败，保留缓存/继续..."
+[ -s "$ACCEL_DIR/lz4accel.c" ] && [ -s "$ACCEL_DIR/lz4accel.h" ] ||
+  { fetch_gh_file "palazik/android_kernel_common_oneplus_sm8750" "fs/f2fs/lz4armv8/lz4accel.c" "$PALAZIK_BRANCH" "$ACCEL_DIR/lz4accel.c" || warn "lz4accel.c 拉取失败，保留缓存/继续..."
+    fetch_gh_file "palazik/android_kernel_common_oneplus_sm8750" "fs/f2fs/lz4armv8/lz4accel.h" "$PALAZIK_BRANCH" "$ACCEL_DIR/lz4accel.h" || warn "lz4accel.h 拉取失败，保留缓存/继续..."; }
 mkdir -p fs/f2fs/lz4armv8
 cp "$ACCEL_DIR/lz4accel.c" fs/f2fs/lz4armv8/
 cp "$ACCEL_DIR/lz4accel.h" fs/f2fs/lz4armv8/
@@ -386,10 +382,10 @@ info "风驰引擎补丁注入完成"
 if [[ "$DROIDSPACES_ENABLE" != "false" ]]; then
   info "启用 Droidspaces 容器支持..."
   cd "$GITHUB_WORKSPACE/kernel_workspace"
-  apply_repo_patch "droidspaces_patch/fix_sysvipc_kabi_6_7_8.patch" /tmp/fix_sysvipc.patch nonstrict "fix_sysvipc_kabi 补丁"
-  apply_repo_patch "droidspaces_patch/fix_oplus_bsp_midas.patch" /tmp/fix_midas.patch nonstrict "fix_oplus_bsp_midas 补丁"
-  fetch_repo_file "droidspaces_patch/ntsync_base.patch" /tmp/ntsync_base.patch
-  if fetch_repo_file "droidspaces_patch/ntsync_compat_android15-$KERNEL_VERSION.patch" /tmp/ntsync_compat.patch; then
+  apply_patch_file "droidspaces_patch/fix_sysvipc_kabi_6_7_8.patch" /tmp/fix_sysvipc.patch nonstrict "fix_sysvipc_kabi 补丁"
+  apply_patch_file "droidspaces_patch/fix_oplus_bsp_midas.patch" /tmp/fix_midas.patch nonstrict "fix_oplus_bsp_midas 补丁"
+  cp "$GITHUB_WORKSPACE/droidspaces_patch/ntsync_base.patch" /tmp/ntsync_base.patch
+  if cp "$GITHUB_WORKSPACE/droidspaces_patch/ntsync_compat_android15-$KERNEL_VERSION.patch" /tmp/ntsync_compat.patch; then
     ( cd ./common && patch -p1 -F 3 < /tmp/ntsync_base.patch ) || true
     ( cd ./common && patch -p1 -F 3 < /tmp/ntsync_compat.patch ) || true
   else
@@ -397,14 +393,14 @@ if [[ "$DROIDSPACES_ENABLE" != "false" ]]; then
     ( cd ./common && patch -p1 -F 3 < /tmp/ntsync_base.patch ) || true
   fi
   if [[ "$DROIDSPACES_ENABLE" == "extend" ]]; then
-    apply_repo_patch "droidspaces_patch/evdi_drm.patch" /tmp/evdi_drm.patch nonstrict "evdi_drm 补丁"
+    apply_patch_file "droidspaces_patch/evdi_drm.patch" /tmp/evdi_drm.patch nonstrict "evdi_drm 补丁"
   fi
 fi
 
 # ===== ADIOS =====
 info "启用 ADIOS I/O 调度器..."
 cd "$GITHUB_WORKSPACE/kernel_workspace"
-apply_repo_patch "other_patch/adios/adios_block_only.patch" /tmp/adios.patch strict "ADIOS 补丁"
+apply_patch_file "other_patch/adios/adios_block_only.patch" /tmp/adios.patch strict "ADIOS 补丁"
 
 # ===== Re-Kernel =====
 if [[ "$REKERNEL_ENABLE" == "true" ]]; then

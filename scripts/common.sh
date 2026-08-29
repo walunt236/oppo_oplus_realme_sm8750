@@ -47,15 +47,13 @@ fetch_gh_file() {
     python3 -c "import sys,json,base64;open('$out','wb').write(base64.b64decode(json.load(sys.stdin)['content']))"
 }
 
-fetch_repo_file() { fetch_gh_file "$GITHUB_REPOSITORY" "$1" "$GITHUB_REF_NAME" "$2"; }
-
 find_latest() {
   find "$1" -type f -name "$2" 2>/dev/null | sort | tail -n 1 || true
 }
 
-apply_repo_patch() {
-  local repo_path="$1" out="$2" mode="$3" label="$4"
-  fetch_repo_file "$repo_path" "$out"
+apply_patch_file() {
+  local src="$1" out="$2" mode="$3" label="$4"
+  cp "$GITHUB_WORKSPACE/$src" "$out"
   if ( cd ./common && patch -p1 -F 3 < "$out" ); then
     info "$label 应用成功"
   elif [[ "$mode" == "strict" ]]; then
