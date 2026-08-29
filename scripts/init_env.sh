@@ -57,7 +57,7 @@ OEM_BRANCH="oneplus/sm8750_b_16.0.0_oneplus_13"
 # AOSP 标签查询与 OEM/vendor 拉取并行
 mkdir -p "$HOME/.cache_patches"
 info "后台预查询 AOSP 最新标签..."
-( glr ls-remote --tags --sort=-v:refname https://android.googlesource.com/kernel/common 'refs/tags/android15-6.6.*_r00' | head -1 | awk '{print $2}' | sed 's|refs/tags/||' > "$HOME/.cache_patches/latest_aosp_tag" ) &
+( gproxy ls-remote --tags --sort=-v:refname https://android.googlesource.com/kernel/common 'refs/tags/android15-6.6.*_r00' | head -1 | awk '{print $2}' | sed 's|refs/tags/||' > "$HOME/.cache_patches/latest_aosp_tag" ) &
 AOSP_TAG_PID=$!
 
 if [ -d "common/.git" ]; then
@@ -111,7 +111,7 @@ info "AOSP 最新发布标签: $LATEST_AOSP_TAG"
 # 直连+代理双通道，三次全败才停（网络抖动容错）
 FETCH_OK=0
 for i in 1 2 3; do
-  if glr fetch --depth=1 --no-tags https://android.googlesource.com/kernel/common "$LATEST_AOSP_TAG"; then
+  if gproxy fetch --depth=1 --no-tags https://android.googlesource.com/kernel/common "$LATEST_AOSP_TAG"; then
     FETCH_OK=1
     break
   fi
