@@ -154,4 +154,19 @@ if [[ -n "${PATCH_HASH:-}" ]] && [[ -n "${CFG_HASH:-}" ]]; then
   printf '%s|%s' "$PATCH_HASH" "$CFG_HASH" > "$HOME/.cache_patches/build_state"
   info "增量指纹+配置哈希已记录，下次相同状态将增量编译"
 fi
+
+if [ -s "$PENDING_SYNC" ]; then
+  info "构建后补拉同步失败的上游仓库..."
+  : > "$PENDING_SYNC.tmp"
+  while IFS='|' read -r u d b; do
+    [ -z "$d" ] && continue
+    if sync_repo "$u" "$d" "$b"; then
+      info "补拉成功: $d（下次构建生效）"
+    else
+      echo "$u|$d|$b" >> "$PENDING_SYNC.tmp"
+      error "补拉仍失败: $d（已记录，下次构建继续重试）"
+    fi
+  done < "$PENDING_SYNC"
+  mv "$PENDING_SYNC.tmp" "$PENDING_SYNC"
+fi
 info "磁盘清理完成"

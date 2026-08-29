@@ -5,21 +5,6 @@ source "$(dirname "$0")/common.sh"
 
 cd "$GITHUB_WORKSPACE/kernel_workspace"
 
-sync_repo() {
-  local url="$1" dir="$2" branch="${3:-main}"
-  if [ -d "$dir/.git" ]; then
-    if glr fetch -C "$dir" --depth=1 origin "$branch"; then
-      git -C "$dir" reset --hard FETCH_HEAD
-      info "[动态] $dir 已同步 $branch 最新"
-    else
-      warn "$dir fetch 失败，使用本地已有版本"
-    fi
-  else
-    rm -rf "$dir"
-    glr clone --depth=1 "$url" "$dir" -b "$branch" || { error "补丁仓克隆失败: $url ($branch)"; exit 1; }
-  fi
-}
-
 count_rejs() {
   local label="$1" n
   n=$(find . -name "*.rej" 2>/dev/null | wc -l || true)
@@ -43,17 +28,7 @@ rm -rf common/drivers/kernelsu
 
 if [[ "$KSU_TYPE" == "sukisu" || "$KSU_TYPE" == "resukisu" ]]; then
   info "配置 ReSukiSU..."
-  if [ -d KernelSU/.git ]; then
-    info "[秒过] ReSukiSU 仓库已存在，增量同步..."
-    if glr fetch -C KernelSU origin main 2>/dev/null; then
-      git -C KernelSU reset --hard FETCH_HEAD
-    else
-      warn "KernelSU 增量拉取失败，使用本地已有版本"
-    fi
-  else
-    rm -rf KernelSU
-    glr clone -b main https://github.com/ReSukiSU/ReSukiSU.git KernelSU
-  fi
+  sync_repo "https://github.com/ReSukiSU/ReSukiSU.git" KernelSU main
   link_ksu_kernel KernelSU
   echo 'CONFIG_KSU_FULL_NAME_FORMAT="%TAG_NAME%-%COMMIT_SHA%@walunt236"' >> ./common/arch/arm64/configs/gki_defconfig
   cd ./KernelSU
@@ -65,17 +40,7 @@ if [[ "$KSU_TYPE" == "sukisu" || "$KSU_TYPE" == "resukisu" ]]; then
   echo "ksuver=$KSU_VERSION" >> "$GITHUB_OUTPUT"
 elif [[ "$KSU_TYPE" == "ksunext" ]]; then
   info "配置 KernelSU Next..."
-  if [ -d KernelSU-Next/.git ]; then
-    info "[秒过] KernelSU-Next 仓库已存在，增量同步..."
-    if glr fetch -C KernelSU-Next origin dev-susfs 2>/dev/null; then
-      git -C KernelSU-Next reset --hard FETCH_HEAD
-    else
-      warn "KernelSU-Next 增量拉取失败，使用本地已有版本"
-    fi
-  else
-    rm -rf KernelSU-Next
-    glr clone -b dev-susfs https://github.com/pershoot/KernelSU-Next.git KernelSU-Next
-  fi
+  sync_repo "https://github.com/pershoot/KernelSU-Next.git" KernelSU-Next dev-susfs
   link_ksu_kernel KernelSU-Next
   cd KernelSU-Next
   KSU_COMMITS=$(ksu_commit_count pershoot/KernelSU-Next dev)
@@ -94,17 +59,7 @@ elif [[ "$KSU_TYPE" == "ksunext" ]]; then
   patch -p2 -N -F 3 < apk_sign.patch || true
 elif [[ "$KSU_TYPE" == "ksu" ]]; then
   info "配置原版 KernelSU..."
-  if [ -d KernelSU/.git ]; then
-    info "[秒过] KernelSU 仓库已存在，增量同步..."
-    if glr fetch -C KernelSU origin main 2>/dev/null; then
-      git -C KernelSU reset --hard FETCH_HEAD
-    else
-      warn "KernelSU 增量拉取失败，使用本地已有版本"
-    fi
-  else
-    rm -rf KernelSU
-    glr clone -b main https://github.com/tiann/KernelSU.git KernelSU
-  fi
+  sync_repo "https://github.com/tiann/KernelSU.git" KernelSU main
   link_ksu_kernel KernelSU
   cd ./KernelSU
   KSU_COMMITS=$(ksu_commit_count tiann/KernelSU main)
@@ -478,3 +433,6 @@ for feat in NEXT_BUDDY HRTICK SIS_PROP; do
 done
 
 info "调度器优化完成 (16ms PELT / NEXT_BUDDY / HRTICK / SIS_PROP)"
+
+touch /tmp/sync_failed.list
+cp /tmp/sync_failed.list "$PENDING_SYNC"

@@ -18,6 +18,24 @@ gproxy() {
   git -c http.proxy=http://127.0.0.1:7897 -c https.proxy=http://127.0.0.1:7897 -c http.version=HTTP/1.1 -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=60 "$@"
 }
 
+PENDING_SYNC="$HOME/.cache_patches/pending_sync"
+
+sync_repo() {
+  local url="$1" dir="$2" branch="${3:-main}"
+  if [ -d "$dir/.git" ]; then
+    if glr fetch -C "$dir" --depth=1 origin "$branch"; then
+      git -C "$dir" reset --hard FETCH_HEAD
+      info "[动态] $dir 已同步 $branch 最新"
+    else
+      warn "$dir fetch 失败，使用本地已有版本"
+      echo "$url|$dir|$branch" >> /tmp/sync_failed.list
+    fi
+  else
+    rm -rf "$dir"
+    glr clone --depth=1 "$url" "$dir" -b "$branch" || { error "补丁仓克隆失败: $url ($branch)"; exit 1; }
+  fi
+}
+
 detect_proxy() {
   if curl -s -o /dev/null --connect-timeout 2 --max-time 3 --proxy http://127.0.0.1:7897 https://api.github.com 2>/dev/null; then
     echo "http_proxy=http://127.0.0.1:7897" >> "$GITHUB_ENV"
