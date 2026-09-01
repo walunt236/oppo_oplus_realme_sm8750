@@ -54,7 +54,7 @@ else
 fi
 # zip 用 ./* 通配符，.git 不打包但保留供下次增量拉取
 cd AnyKernel3
-git clean -fdq
+git clean -ffdqx
 # 一加13 适配 overlay（官方模板 + 自控适配，官方更新直接合并）
 if [ -d "$GITHUB_WORKSPACE/ak3_overlay" ]; then
   cp -r "$GITHUB_WORKSPACE/ak3_overlay/"* . || { error "ak3_overlay 拷贝失败"; exit 1; }
