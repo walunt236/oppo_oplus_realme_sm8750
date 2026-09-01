@@ -125,6 +125,7 @@ BBG: $BASEBAND_GUARD
 RCU_NOCB: $RCU_NOCB_ENABLE
 EOF
 
+rm -f ../AnyKernel3-*.zip
 zip -r "../$AK3_NAME" ./*
 echo "ak3name=$AK3_NAME" >> "$GITHUB_OUTPUT"
 
