@@ -108,13 +108,11 @@ if [[ "$O3_SELECTIVE" == "true" ]]; then
 fi
 
 # ===== DMA-BUF 页池扩容 =====
-if [[ "$O3_SELECTIVE" == "true" ]]; then
-  cd "$GITHUB_WORKSPACE/kernel_workspace"
-  SYS_HEAP=$(find common drivers -name "system_heap.c" 2>/dev/null | head -n 1 || true)
-  if [ -n "$SYS_HEAP" ] && [ -f "$SYS_HEAP" ]; then
-    sed -i 's/static u32 max_pool_size = .*/static u32 max_pool_size = 65536;/g' "$SYS_HEAP" 2>/dev/null || true
-    info "DMA-BUF 页池扩容完成"
-  fi
+cd "$GITHUB_WORKSPACE/kernel_workspace"
+SYS_HEAP=$(find common drivers -name "system_heap.c" 2>/dev/null | head -n 1 || true)
+if [ -n "$SYS_HEAP" ] && [ -f "$SYS_HEAP" ]; then
+  sed -i 's/static u32 max_pool_size = .*/static u32 max_pool_size = 65536;/g' "$SYS_HEAP" 2>/dev/null || true
+  info "DMA-BUF 页池扩容完成"
 fi
 
 # ===== 编译完整内核镜像 =====
@@ -261,8 +259,12 @@ make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="cca
 assert_ikcfg() {
   grep -q "^${1}=y" <<< "$IKCFG_TEXT" || die "Image 内嵌配置缺少 ${1}，产物配置陈旧，中止"
 }
-if [ -f out/arch/arm64/boot/Image ] && strings -a out/arch/arm64/boot/Image | grep -qa "IKCFG_ST"; then
+if [ -f out/arch/arm64/boot/Image ]; then
   IKCFG_TEXT=$(perl -e 'open(F,"<",$ARGV[0]); local $/; $d=<F>; close F; $d =~ /IKCFG_ST(.*?)IKCFG_ED/s; open(G,"|-","gzip -dc 2>/dev/null"); print G $1; close G;' out/arch/arm64/boot/Image 2>/dev/null)
+  if [ -z "$IKCFG_TEXT" ]; then
+    error "Image 内嵌配置数据缺失（IKCFG 提取失败），产物配置陈旧，中止"
+    exit 1
+  fi
   assert_ikcfg CONFIG_ZRAM_MEMORY_TRACKING
   assert_ikcfg CONFIG_AUTOFDO_CLANG
   assert_ikcfg CONFIG_HZ_300

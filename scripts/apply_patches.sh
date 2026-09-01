@@ -32,9 +32,14 @@ if [[ "$KSU_TYPE" == "sukisu" || "$KSU_TYPE" == "resukisu" ]]; then
   link_ksu_kernel KernelSU
   echo 'CONFIG_KSU_FULL_NAME_FORMAT="%TAG_NAME%-%COMMIT_SHA%@walunt236"' >> ./common/arch/arm64/configs/gki_defconfig
   cd ./KernelSU
-  KSU_VERSION=$(expr $(git rev-list --count main) + 30700 2>/dev/null || echo 0)
+  KSU_COMMITS=$(ksu_commit_count ReSukiSU/ReSukiSU main)
+  KSU_COMMITS=${KSU_COMMITS:-0}
+  if [[ "$KSU_COMMITS" == "0" ]]; then
+    warn "ReSukiSU 提交数获取失败，版本号降级为基线"
+  fi
+  KSU_VERSION=$(expr "$KSU_COMMITS" + 30700 2>/dev/null || echo 0)
   if [[ "$KSU_VERSION" == "0" ]]; then
-    warn "ReSukiSU 提交数获取失败，版本号降级为 0"
+    warn "ReSukiSU 版本号计算失败，版本号降级为 0"
   fi
   echo "KSUVER=$KSU_VERSION" >> "$GITHUB_ENV"
   echo "ksuver=$KSU_VERSION" >> "$GITHUB_OUTPUT"
@@ -269,13 +274,13 @@ else
   fetch_gh_file "mrcxlinux/kernel_patches" "common/EnablePOLLY.patch" "main" "/tmp/EnablePOLLY.patch" || warn "EnablePOLLY.patch 下载失败，继续..."
   patch -p1 --forward -f < /tmp/EnablePOLLY.patch || warn "EnablePOLLY.patch 应用失败，继续..."
 fi
-curl -fSL --retry 3 --retry-delay 5 --retry-all-errors -o /tmp/mm_zsmalloc.patch "https://github.com/brokestar233/android_kernel_common_oneplus_sm8750/commit/d831954.patch"
+curl -fSL --retry 3 --retry-delay 5 --retry-all-errors --connect-timeout 10 --max-time 30 -o /tmp/mm_zsmalloc.patch "https://github.com/brokestar233/android_kernel_common_oneplus_sm8750/commit/d831954.patch"
 patch -p1 --forward -f < /tmp/mm_zsmalloc.patch || warn "mm_zsmalloc 应用失败，继续..."
-curl -fSL --retry 3 --retry-delay 5 --retry-all-errors -o /tmp/mm_kvmalloc.patch "https://github.com/brokestar233/android_kernel_common_oneplus_sm8750/commit/a8093f3.patch"
+curl -fSL --retry 3 --retry-delay 5 --retry-all-errors --connect-timeout 10 --max-time 30 -o /tmp/mm_kvmalloc.patch "https://github.com/brokestar233/android_kernel_common_oneplus_sm8750/commit/a8093f3.patch"
 patch -p1 --forward -f < /tmp/mm_kvmalloc.patch || warn "mm_kvmalloc 应用失败，继续..."
-curl -fSL --retry 3 --retry-delay 5 --retry-all-errors -o /tmp/mm_slab.patch "https://github.com/brokestar233/android_kernel_common_oneplus_sm8750/commit/936de3f.patch"
+curl -fSL --retry 3 --retry-delay 5 --retry-all-errors --connect-timeout 10 --max-time 30 -o /tmp/mm_slab.patch "https://github.com/brokestar233/android_kernel_common_oneplus_sm8750/commit/936de3f.patch"
 patch -p1 --forward -f < /tmp/mm_slab.patch || warn "mm_slab 应用失败，继续..."
-curl -fSL --retry 3 --retry-delay 5 --retry-all-errors -o /tmp/mm_vmpressure.patch "https://github.com/brokestar233/android_kernel_common_oneplus_sm8750/commit/99b920c.patch"
+curl -fSL --retry 3 --retry-delay 5 --retry-all-errors --connect-timeout 10 --max-time 30 -o /tmp/mm_vmpressure.patch "https://github.com/brokestar233/android_kernel_common_oneplus_sm8750/commit/99b920c.patch"
 patch -p1 --forward -f < /tmp/mm_vmpressure.patch || warn "mm_vmpressure 应用失败，继续..."
 
 TOTAL_REJ=0
@@ -385,6 +390,7 @@ if [[ "$BASEBAND_GUARD" == "true" ]]; then
     exit 1
   }
   sed -i '/^config LSM$/,/^help$/{ /^[[:space:]]*default/ { /baseband_guard/! s/selinux/selinux,baseband_guard/ } }' security/Kconfig
+  grep -q 'baseband_guard' security/Kconfig || { error "BBG LSM 注入失败（security/Kconfig 无 baseband_guard），中止构建"; exit 1; }
 fi
 
 # ===== BBRv3 =====
