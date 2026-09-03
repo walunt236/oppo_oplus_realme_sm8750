@@ -1,5 +1,4 @@
 #!/bin/bash
-# apply_patches.sh — 源码修改域：KSU/SUSFS/lz4/风驰/Droidspaces/ADIOS/BBG/BBRv3/调度
 set -euo pipefail
 source "$(dirname "$0")/common.sh"
 
@@ -23,7 +22,7 @@ ksu_commit_count() {
   curl -sI --retry 3 --retry-delay 5 "https://api.github.com/repos/$1/commits?sha=$2&per_page=1" | grep -i "link:" | sed -n 's/.*page=\([0-9]*\)>; rel="last".*/\1/p' || true
 }
 
-# ============ KernelSU ============
+# KernelSU
 rm -rf common/drivers/kernelsu
 
 if [[ "$KSU_TYPE" == "sukisu" || "$KSU_TYPE" == "resukisu" ]]; then
@@ -84,7 +83,7 @@ else
   echo "ksuver=none" >> "$GITHUB_OUTPUT"
 fi
 
-# ===== 补丁仓并行预取 =====
+# 补丁仓并行预取
 SUSFS_CACHE_DIR="$HOME/.cache_patches/susfs4ksu"
 ZRAM_CACHE_DIR="$HOME/.cache_patches/zram_patches"
 SUKI_CACHE_DIR="$HOME/.cache_patches/sukisu_patches"
@@ -102,7 +101,7 @@ sync_repo "https://github.com/WildKernels/kernel_patches.git" "$WILD_DIR" || tru
 wait || die "补丁仓预取失败"
 info "补丁仓并行预取完成"
 
-# ===== SUSFS（官方源 ShirkNeko/susfs4ksu，GKI android15-6.6 分支） =====
+# SUSFS
 if [[ "$SUSFS_ENABLE" == "true" ]]; then
   if [[ "$KSU_TYPE" != "none" ]]; then
     cd "$GITHUB_WORKSPACE/kernel_workspace"
@@ -119,7 +118,6 @@ if [[ "$SUSFS_ENABLE" == "true" ]]; then
 
     cd ./common
 
-    # 预处理 task_mmu.c 防止补丁偏移报错
     sed -i -e '/int ret = 0, copied = 0;/a \    unsigned int nr_subpages = __PAGE_SIZE / PAGE_SIZE;' -e '/int ret = 0, copied = 0;/a \    pagemap_entry_t *res = NULL;' ./fs/proc/task_mmu.c || true
 
     patch -p1 < 50_add_susfs_in_gki-android15-6.6.patch || {
@@ -127,7 +125,6 @@ if [[ "$SUSFS_ENABLE" == "true" ]]; then
       exit 1
     }
 
-    # 删除预处理插入的声明（4 空格缩进）——补丁自带 tab 缩进声明，锚定区分防重复
     sed -i '/^    unsigned int nr_subpages = __PAGE_SIZE \/ PAGE_SIZE;$/d; /^    pagemap_entry_t \*res = NULL;$/d' ./fs/proc/task_mmu.c || true
 
     patch -p1 -N -F 3 < 69_hide_stuff.patch || true
@@ -144,7 +141,7 @@ if [[ "$SUSFS_ENABLE" == "true" ]]; then
   fi
 fi
 
-# ===== lz4/zstd =====
+# lz4/zstd
 cd "$GITHUB_WORKSPACE/kernel_workspace/common"
 
 cp "$ZRAM_CACHE_DIR/zram/001-lz4.patch" . || exit 1
@@ -155,7 +152,6 @@ cp "$ZRAM_CACHE_DIR/zram/lz4armv8.S" lib/lz4/lz4armv8/lz4armv8.S || true
 
 ACCEL_DIR="$HOME/.cache_patches/lz4accel"
 mkdir -p "$ACCEL_DIR"
-# 固定 6.6.142 分支（与 AOSP merge 基线一致，防 API 漂移）
 PALAZIK_BRANCH="6.6.142_oneplus13_coloros16"
 info "lz4accel 上游分支: $PALAZIK_BRANCH"
 [ -s "$ACCEL_DIR/lz4accel.c" ] && [ -s "$ACCEL_DIR/lz4accel.h" ] ||
@@ -168,7 +164,6 @@ cp "$ACCEL_DIR/lz4accel.h" fs/f2fs/lz4armv8/
 git apply --reject --whitespace=nowarn 001-lz4.patch || true
 patch -p1 -t -F 3 < 002-zstd.patch || true
 
-# 校验：lz4armv8.S（NEON 解压）+ zstd 补丁就位（001-lz4.patch 为 IDEA 格式 binary 段，git apply 无法应用，lz4 用内核原版）
 if [ -f lib/lz4/lz4armv8/lz4armv8.S ] && [ -f lib/zstd/zstd_common_module.c ]; then
   info "lz4 NEON 解压 + zstd 就位"
 else
@@ -176,7 +171,7 @@ else
   exit 1
 fi
 
-# ===== lz4kd =====
+# lz4kd
 if [[ "$LZ4KD_ENABLE" == "true" ]]; then
   cd "$GITHUB_WORKSPACE/kernel_workspace/common"
 
@@ -194,10 +189,9 @@ if [[ "$LZ4KD_ENABLE" == "true" ]]; then
   fi
 fi
 
-# ===== 风驰引擎及优化补丁批 =====
+# 风驰引擎及优化补丁批
 cd "$GITHUB_WORKSPACE/kernel_workspace"
 
-# 优先 oneplus/hmbird，未命中全仓搜索（上游目录可能变动）
 PATCH_FILE=$(find_latest "$WILD_DIR/oneplus/hmbird/" "fengchi_OP13_*.patch")
 if [ -z "$PATCH_FILE" ]; then
   warn "oneplus/hmbird 目录未找到风驰补丁，开始全仓搜索..."
@@ -288,7 +282,6 @@ patch -p1 --forward -f < /tmp/mm_vmpressure.patch || warn "mm_vmpressure 应用�
 TOTAL_REJ=0
 count_rejs "风驰批"
 
-# AOSP 上游补丁批（aosp-mirror commit.patch，纯直连通道；本地缓存化）
 mkdir -p "$HOME/.cache_patches/aosp"
 for hash in 47f80469849a 5fddd8e6a0a7 0a9eef42768c 71bd6942e33f ef0123e95425 7abe312b37cf 6a42fccfc2bc d43ee181a478 5c8ecdcfbfb0 c5d6863c9aba 9eecad532ad3 c7a8aea27b87; do
   if [ ! -s "$HOME/.cache_patches/aosp/$hash.patch" ]; then
@@ -301,7 +294,6 @@ for hash in 47f80469849a 5fddd8e6a0a7 0a9eef42768c 71bd6942e33f ef0123e95425 7ab
 done
 count_rejs "AOSP"
 
-# palazik 补丁批（本地缓存化）
 mkdir -p "$HOME/.cache_patches/palazik"
 for hash in e8400a0 a09e19e; do
   if [ ! -s "$HOME/.cache_patches/palazik/$hash.patch" ]; then
@@ -344,7 +336,7 @@ fi
 
 info "风驰引擎补丁注入完成"
 
-# ============ Droidspaces ============
+# Droidspaces
 if [[ "$DROIDSPACES_ENABLE" != "false" ]]; then
   info "启用 Droidspaces 容器支持..."
   cd "$GITHUB_WORKSPACE/kernel_workspace"
@@ -363,25 +355,24 @@ if [[ "$DROIDSPACES_ENABLE" != "false" ]]; then
   fi
 fi
 
-# ===== ADIOS =====
+# ADIOS
 info "启用 ADIOS I/O 调度器..."
 cd "$GITHUB_WORKSPACE/kernel_workspace"
 apply_patch_file "other_patch/adios/adios_block_only.patch" /tmp/adios.patch strict "ADIOS 补丁"
 
-# ===== Re-Kernel =====
+# Re-Kernel
 if [[ "$REKERNEL_ENABLE" == "true" ]]; then
   info "启用 Re-Kernel 支持..."
   cd "$GITHUB_WORKSPACE/kernel_workspace"
   echo "CONFIG_REKERNEL=y" >> ./common/arch/arm64/configs/gki_defconfig
 fi
 
-# ===== Baseband-guard（官方源 vc-teahouse） =====
+# Baseband-guard
 if [[ "$BASEBAND_GUARD" == "true" ]]; then
   info "启用基带保护..."
   cd "$GITHUB_WORKSPACE/kernel_workspace"
   echo "CONFIG_BBG=y" >> ./common/arch/arm64/configs/gki_defconfig
   cd common
-  # 两步执行（下载到文件再执行，非管道）
   curl -fSL --retry 3 --retry-delay 5 --retry-all-errors -o /tmp/baseband_setup.sh \
     "https://github.com/vc-teahouse/Baseband-guard/raw/main/setup.sh" || {
     error "Baseband-guard 脚本下载失败"
@@ -395,7 +386,7 @@ if [[ "$BASEBAND_GUARD" == "true" ]]; then
   grep -q 'baseband_guard' security/Kconfig || { error "BBG LSM 注入失败（security/Kconfig 无 baseband_guard），中止构建"; exit 1; }
 fi
 
-# ===== BBRv3 =====
+# BBRv3
 info "应用 BBRv3 补丁..."
 cd "$GITHUB_WORKSPACE/kernel_workspace/common"
 fetch_gh_file "WildKernels/kernel_patches" "common/bbrv3/0001-net-tcp-backport-BBRv3-to-android15-6.6.patch" "main" /tmp/bbrv3.patch
@@ -412,10 +403,9 @@ fi
 echo "CONFIG_TCP_CONG_BBR3=y" >> ./arch/arm64/configs/gki_defconfig
 echo "CONFIG_DEFAULT_BBR3=y" >> ./arch/arm64/configs/gki_defconfig
 
-# ===== 调度器优化（16ms PELT / NEXT_BUDDY / HRTICK / SIS_PROP） =====
+# 调度器优化
 cd "$GITHUB_WORKSPACE/kernel_workspace/common"
 
-# PELT 半衰期 32ms -> 16ms
 cat > kernel/sched/sched-pelt.h << 'PELTEOF'
 /* SPDX-License-Identifier: GPL-2.0 */
 /* Generated by Documentation/scheduler/sched-pelt; do not modify. */

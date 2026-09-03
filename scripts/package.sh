@@ -1,9 +1,8 @@
 #!/bin/bash
-# package.sh — KPM 修补/AnyKernel3 打包/本地保存/清理
 set -euo pipefail
 source "$(dirname "$0")/common.sh"
 
-# ===== KPM 修补 =====
+# KPM 修补
 if [[ "$KPM_ENABLE" == 'builtin' ]] && ( [[ "$KSU_TYPE" == "sukisu" ]] || [[ "$KSU_TYPE" == "resukisu" ]] ); then
   info "应用 KPM 并修补内核..."
   cd kernel_workspace/common/out/arch/arm64/boot
@@ -37,11 +36,10 @@ if [[ "$KPM_ENABLE" == 'kpn' ]]; then
   fi
 fi
 
-# ===== AnyKernel3 打包 =====
+# AnyKernel3 打包
 cd kernel_workspace
 if [ -d AnyKernel3/.git ]; then
   info "AnyKernel3 仓库已存在，增量同步..."
-  # 旧缓存 origin 是 cctv18，纠正为官方 fork（walunt236）
   git -C AnyKernel3 remote set-url origin https://github.com/walunt236/AnyKernel3 2>/dev/null || true
   if glr -C AnyKernel3 fetch --depth=1 origin && git -C AnyKernel3 reset --hard FETCH_HEAD; then
     :
@@ -52,17 +50,14 @@ else
   rm -rf AnyKernel3
   retry "AnyKernel3 克隆" 8 5 glr clone https://github.com/walunt236/AnyKernel3 --depth=1 AnyKernel3 || die "AnyKernel3 克隆失败，终止打包"
 fi
-# zip 用 ./* 通配符，.git 不打包但保留供下次增量拉取
 cd AnyKernel3
 git clean -ffdqx
-# 一加13 适配 overlay（官方模板 + 自控适配，官方更新直接合并）
 if [ -d "$GITHUB_WORKSPACE/ak3_overlay" ]; then
   cp -r "$GITHUB_WORKSPACE/ak3_overlay/"* . || { error "ak3_overlay 拷贝失败"; exit 1; }
 else
   error "ak3_overlay 目录缺失（无 cctv18 适配将无法刷入），中止打包"
   exit 1
 fi
-# 工具：Magisk 官方源拉取 arm64（busybox/magiskboot），失败回退 overlay 内置
 TOOL_CACHE="$HOME/.cache_patches/ak3tools"
 mkdir -p "$TOOL_CACHE"
 MAGISK_TAG=$(curl -fsSL --retry 2 --connect-timeout 10 --max-time 20 -H "Authorization: token ${GH_TOKEN:-}" "https://api.github.com/repos/topjohnwu/Magisk/releases/latest" 2>/dev/null | grep -oE '"tag_name": *"[^"]+"' | head -1 | cut -d'"' -f4 || true)
@@ -140,9 +135,8 @@ if [[ "$RUNNER_TYPE" == "self-hosted" ]]; then
   info "已成功保存至本地路径: $TARGET_DIR/$AK3_NAME"
 fi
 
-# ===== 本地工作区清理 =====
+# 本地工作区清理
 info "清理编译产出和临时文件..."
-# 保留 common/out 供增量编译复用（make 依赖追踪自动处理源码/配置变化），仅清理 vendor 输出
 rm -rf kernel_workspace/vendor_modules/out
 rm -f /tmp/*.patch
 ccache -c
@@ -150,7 +144,6 @@ info "ccache 已裁剪至上限"
 for repo in "$HOME/.cache_patches/"*; do
   [ -d "$repo/.git" ] && git -C "$repo" gc --auto 2>/dev/null || true
 done
-# 记录本次成功构建的源码指纹+配置哈希（v2 格式 PATCH_HASH|CFG_HASH；失败则不写，下次自动全量）
 if [[ -n "${PATCH_HASH:-}" ]] && [[ -n "${CFG_HASH:-}" ]]; then
   mkdir -p "$HOME/.cache_patches"
   printf '%s|%s' "$PATCH_HASH" "$CFG_HASH" > "$HOME/.cache_patches/build_state"

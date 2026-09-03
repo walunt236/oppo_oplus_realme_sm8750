@@ -1,17 +1,14 @@
 #!/bin/bash
-# build_kernel.sh — 增量钳制/构建配置/编译/IKCFG 校验
 set -euo pipefail
 source "$(dirname "$0")/common.sh"
 
-# ===== 增量编译 mtime 钳制 =====
+# 增量编译 mtime 钳制
 cd "$GITHUB_WORKSPACE/kernel_workspace/common"
-# 源码树指纹 = git status porcelain 哈希
 PATCH_HASH=$(git status --porcelain 2>/dev/null | md5sum | cut -d' ' -f1)
 echo "PATCH_HASH=$PATCH_HASH" >> "$GITHUB_ENV"
 STORED=$(cut -d'|' -f1 "$HOME/.cache_patches/build_state" 2>/dev/null || true)
 if [[ "$STORED" == "$PATCH_HASH" ]]; then
   info "增量编译：源码指纹与上次成功构建一致，钳制全部跟踪源文件 mtime..."
-  # 指纹一致 ⇒ 整棵树逐字节相同 ⇒ 全部 .o 有效；钳制 Makefile/Kconfig 阻断 GEN 级联重编
   git ls-files | xargs -r -P 16 touch -d @1500000000 2>/dev/null || true
   git update-index --refresh 2>/dev/null || true
   info "mtime 钳制完成，make 将只重编被补丁改动的文件"
@@ -19,7 +16,7 @@ else
   info "全量模式：源码指纹变化/首次构建/上次构建未成功"
 fi
 
-# ===== 构建内核配置 =====
+# 构建内核配置
 cd "$GITHUB_WORKSPACE/kernel_workspace/common"
 
 load_toolchain_env() {
@@ -36,7 +33,6 @@ assert_config() {
 
 load_toolchain_env
 
-# 默认增量；clean_build=true 强制全量
 if [[ "$CLEAN_BUILD" == "true" ]]; then
   info "clean_build 开启，删除 out/ 执行全量重建..."
   rm -rf out
@@ -48,7 +44,6 @@ make_defconfig() {
 
 make_defconfig
 
-# .config 哈希纳入增量判定（新增符号时 kbuild 不会重编依赖文件）
 CFG_HASH=$(md5sum out/.config | cut -d' ' -f1)
 echo "CFG_HASH=$CFG_HASH" >> "$GITHUB_ENV"
 STORED_CFG=$(cut -d'|' -f2 "$HOME/.cache_patches/build_state" 2>/dev/null || true)
@@ -76,7 +71,6 @@ if [ -f out/.config ]; then
   fi
 fi
 
-# AutoFDO 默认开启：.config 校验（缺失即停摆）
 assert_config CONFIG_AUTOFDO_CLANG "AutoFDO (AUTOFDO_CLANG)"
 assert_config CONFIG_SECTION_MISMATCH_WARN_ONLY "SECTION_MISMATCH_WARN_ONLY (modpost mismatch 降级警告)"
 assert_config CONFIG_LTO_CLANG_THIN "ThinLTO"
@@ -96,7 +90,7 @@ if [[ "$DIAGNOSIS" == "true" ]]; then
   cp out/.config out/build_config.txt
 fi
 
-# ===== 选择性 -O3 =====
+# 选择性 -O3
 if [[ "$O3_SELECTIVE" == "true" ]]; then
   cd "$GITHUB_WORKSPACE/kernel_workspace/common"
   for TARGET_DIR in lib crypto; do
@@ -107,7 +101,7 @@ if [[ "$O3_SELECTIVE" == "true" ]]; then
   info "选择性O3与Polly配置完成"
 fi
 
-# ===== DMA-BUF 页池扩容 =====
+# DMA-BUF 页池扩容
 cd "$GITHUB_WORKSPACE/kernel_workspace"
 SYS_HEAP=$(find common drivers -name "system_heap.c" 2>/dev/null | head -n 1 || true)
 if [ -n "$SYS_HEAP" ] && [ -f "$SYS_HEAP" ]; then
@@ -115,7 +109,7 @@ if [ -n "$SYS_HEAP" ] && [ -f "$SYS_HEAP" ]; then
   info "DMA-BUF 页池扩容完成"
 fi
 
-# ===== 编译完整内核镜像 =====
+# 编译完整内核镜像
 if [[ "$DIAGNOSIS" == "true" ]]; then
   info "诊断模式：跳过内核编译"
   exit 0
@@ -160,7 +154,7 @@ clang --version | head -n 1
 info "链接器版本检查："
 ld.lld --version
 
-# ===== AutoFDO profile 新鲜度检测（内核演进后符号漂移会静默降级，此处暴露） =====
+# AutoFDO profile 新鲜度检测
 if [ -n "$AFDO_PROFILE" ] && [ -f /home/dev/pgo/vmlinux ]; then
   PROFDATA="$HOME/.toolchains/Clang-19.0.0git-20240723/bin/llvm-profdata"
   NM="$HOME/.toolchains/Clang-19.0.0git-20240723/bin/llvm-nm"
@@ -171,21 +165,18 @@ if [ -n "$AFDO_PROFILE" ] && [ -f /home/dev/pgo/vmlinux ]; then
   if [ "$TOTAL" -gt 0 ]; then
     RATE=$(awk -v m="$MATCH" -v t="$TOTAL" 'BEGIN{printf "%.1f", m*100/t}')
     info "AutoFDO profile 符号匹配率: $RATE% ($MATCH/$TOTAL)"
-    # 阈值 50%：profile 含 inline 函数（无符号表条目），正常水平 ~58%
     if awk -v r="$RATE" 'BEGIN{exit !(r < 50)}'; then
       warn "profile 匹配率 <50%——内核已演进，建议重新采样重建 profile"
     fi
   fi
 fi
-# ===== 编译器参数官方工具链支持验证（-### dry-run + 最小编译） =====
+# 编译器参数官方工具链支持验证
 info "编译器参数支持验证（ZyCromerZ clang 19 官方工具链）:"
-# 1. CPU 目标（Oryon）
 if clang -mcpu=oryon-1 -### -c /dev/null 2>&1 | grep -qE "error|unknown|not supported"; then
   echo "  ✗ -mcpu=oryon-1 不被工具链支持！" | tee -a "$LOG_FILE"
 else
   echo "  ✓ -mcpu=oryon-1（Oryon 目标）" | tee -a "$LOG_FILE"
 fi
-# 2. AutoFDO 全套参数（默认开启）
 if [ -n "$AFDO_PROFILE" ]; then
   if clang -fprofile-sample-use="$AFDO_PROFILE" -fprofile-sample-accurate -fdebug-info-for-profiling -mllvm -enable-fs-discriminator=true -mllvm -sample-profile-max-propagate-iterations=300 -### -c /dev/null 2>&1 | grep -qE "error|unknown|not supported"; then
     echo "  ✗ AutoFDO 参数不被工具链支持！" | tee -a "$LOG_FILE"
@@ -193,7 +184,6 @@ if [ -n "$AFDO_PROFILE" ]; then
   else
     echo "  ✓ AutoFDO 全套（-fprofile-sample-use / -fprofile-sample-accurate / -fdebug-info-for-profiling / fs-discriminator / propagate-iterations=300）" | tee -a "$LOG_FILE"
   fi
-  # LTO 链接期二次应用：--lto-sample-profile 工具链接受性验证（空链接 dry-run，-m 指定架构）
   if ld.lld -m aarch64elf --lto-sample-profile="$AFDO_PROFILE" -r -o /dev/null /dev/null 2>&1 | grep -qE "error|unknown|not supported"; then
     echo "  ✗ --lto-sample-profile 不被链接器支持！" | tee -a "$LOG_FILE"
     exit 1
@@ -204,7 +194,6 @@ else
   error "AFDO_PROFILE 未就绪（profile 步骤异常），中止构建"
   exit 1
 fi
-# 3. 核心优化参数（批量 -### 验证）
 for flag in "-O3" "-falign-functions=32" "-falign-loops=32" "-moutline-atomics" "-fno-semantic-interposition" "-fno-math-errno" "-mllvm -polly"; do
   if clang $flag -### -c /dev/null 2>&1 | grep -qE "error|unknown|not supported"; then
     echo "  ✗ $flag 不被工具链支持！" | tee -a "$LOG_FILE"
@@ -212,7 +201,6 @@ for flag in "-O3" "-falign-functions=32" "-falign-loops=32" "-moutline-atomics" 
     echo "  ✓ $flag" | tee -a "$LOG_FILE"
   fi
 done
-# 4. -mllvm LLVM pass 参数（最小编译验证——LLVM 层接受检查）
 for m in enable-misched import-instr-limit enable-gvn-hoist enable-load-pre polly-opt-outer-coincidence inline-threshold inlinehint-threshold enable-loopinterchange enable-ipra enable-phi-of-ops enable-dse-partial-store-merging enable-aarch64-lsr-cost-opt enable-aarch64-or-like-select vectorizer-min-trip-count unroll-threshold enable-loop-distribute; do
   if echo 'int f(int x){return x+1;}' | clang -x c - -fsyntax-only -mllvm -$m=1 2>&1 | grep -qE "error|unknown"; then
     echo "  ✗ -mllvm -$m 不被工具链支持！" | tee -a "$LOG_FILE"
@@ -220,13 +208,11 @@ for m in enable-misched import-instr-limit enable-gvn-hoist enable-load-pre poll
     echo "  ✓ -mllvm -$m" | tee -a "$LOG_FILE"
   fi
 done
-# 5. Polly 向量化（最小编译验证）
 if echo 'int f(int x){return x*2;}' | clang -x c - -fsyntax-only -mllvm -polly -mllvm -polly-vectorizer=stripmine 2>&1 | grep -qE "error|unknown"; then
   echo "  ✗ Polly（-mllvm -polly -polly-vectorizer=stripmine）不被工具链支持！" | tee -a "$LOG_FILE"
 else
   echo "  ✓ Polly（-mllvm -polly -polly-vectorizer=stripmine）" | tee -a "$LOG_FILE"
 fi
-# 6. 工具链预设日志（-Rpass optimization remarks：pass 实际执行验证——非存在性检查）
 info "优化 pass 实际生效验证（工具链 -Rpass 官方日志）:"
 if echo 'static int g(int x){return x*3;} int f(int x){return g(x)+1;}' | clang -x c - -S -o /dev/null -O3 -mllvm -inline-threshold=300 -Rpass=inline 2>&1 | grep -q "inlined into"; then
   echo "  ✓ inline 实际生效（-Rpass=inline: 函数已内联，threshold 参数生效）" | tee -a "$LOG_FILE"
@@ -246,16 +232,13 @@ if [ -n "$AFDO_PROFILE" ]; then
     exit 1
   fi
 fi
-# MGLRU aging 放宽（最后修改，避免被先前补丁覆盖）
 if grep -q 'if (min_seq\[!can_swap\] + MIN_NR_GENS < max_seq)' mm/vmscan.c; then
   sed -i '/if (min_seq\[!can_swap\] + MIN_NR_GENS < max_seq)/,+1d' mm/vmscan.c
   info "MGLRU aging threshold relaxed"
 else
   warn "MGLRU aging line already modified, skipped"
 fi
-# AutoFDO：-fprofile-sample-use + --lto-sample-profile；sample-accurate + 传播迭代 300
 make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" LD="$(pwd)/ld-wrapper" HOSTLD=ld.lld O=out KCFLAGS="-O3 -Wno-error $KCFLAGS_EXTRA -fprofile-sample-accurate -mllvm -sample-profile-max-propagate-iterations=300" CLANG_AUTOFDO_PROFILE="$AFDO_PROFILE" Image
-# 校验 Image 内嵌配置（IKCFG）与 .config 一致
 assert_ikcfg() {
   grep -q "^${1}=y" <<< "$IKCFG_TEXT" || die "Image 内嵌配置缺少 ${1}，产物配置陈旧，中止"
 }
