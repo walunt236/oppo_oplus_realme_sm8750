@@ -1,5 +1,4 @@
 #!/bin/bash
-# common.sh — 公共库：日志/网络回退/重试/补丁拉取
 set -euo pipefail
 
 LOG_FILE="${LOG_FILE:-$GITHUB_WORKSPACE/build_summary.log}"

@@ -55,7 +55,7 @@ git clean -ffdqx
 if [ -d "$GITHUB_WORKSPACE/ak3_overlay" ]; then
   cp -r "$GITHUB_WORKSPACE/ak3_overlay/"* . || { error "ak3_overlay 拷贝失败"; exit 1; }
 else
-  error "ak3_overlay 目录缺失（无 cctv18 适配将无法刷入），中止打包"
+  error "ak3_overlay 目录缺失，中止打包"
   exit 1
 fi
 TOOL_CACHE="$HOME/.cache_patches/ak3tools"

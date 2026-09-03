@@ -1,5 +1,4 @@
 #!/bin/bash
-# lint.sh — 脚本与工作流静态质检
 set -euo pipefail
 cd "$(dirname "$0")/.."
 fail=0

@@ -1,5 +1,4 @@
 #!/bin/bash
-# config_inject.sh — defconfig 注入/cmdline/版本固化
 set -euo pipefail
 source "$(dirname "$0")/common.sh"
 
@@ -56,16 +55,10 @@ fi
 echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" >> "$DCFG"
 sed -i 's/check_defconfig//' ./common/build.config.gki || true
 echo "CONFIG_HEADERS_INSTALL=n" >> "$DCFG"
-# 勿注入 NR_CPUS（per-cpu 与 vendor 模块绑定，32->8 曾 bootloop be907ba）
-# WATERMARK_SCALE_FACTOR 无 Kconfig 符号；运行时走 service.sh
-# AutoFDO 配置注入
 echo "CONFIG_AUTOFDO_CLANG=y" >> "$DCFG"
-# AutoFDO 内联决策变化会触发 modpost section mismatch（如 __list_add 内联进 init 路径引用 .init.data）——
-# 官方开关：mismatch 降级为警告（生命周期同源，安全）
 echo "CONFIG_SECTION_MISMATCH_WARN_ONLY=y" >> "$DCFG"
 
 echo 'CONFIG_ZRAM=y' >> "$DCFG"
-# ZRAM_MEMORY_TRACKING: idle/huge_idle 页重压缩检测的前置（select TRACK_ENTRY_ACTIME），Android mmd 标准配置
 echo 'CONFIG_ZRAM_MEMORY_TRACKING=y' >> "$DCFG"
 echo 'CONFIG_RANDOMIZE_KSTACK_OFFSET_DEFAULT=y' >> "$DCFG"
 echo 'CONFIG_IOMMU_DEFAULT_DMA_STRICT=n' >> "$DCFG"
@@ -130,15 +123,12 @@ CONFIG_DEVTMPFS=y
 NSCFG
 
 info "注入 Vendor 驱动符号 (UBSAN / KUNIT)..."
-# configs.o 修复（IKCFG 陈旧）：-D 时间戳强制重编 + 排除 LTO（thinlto 缓存键不含 .incbin）
 grep -q "CFLAGS_configs.o := -D__IKCFG_BUILD" ./common/kernel/Makefile || \
   echo 'CFLAGS_configs.o := -D__IKCFG_BUILD_$(shell date +%s)' >> ./common/kernel/Makefile
 grep -q "CFLAGS_REMOVE_configs.o" ./common/kernel/Makefile || \
   echo 'CFLAGS_REMOVE_configs.o := -flto=thin -fsplit-lto-unit' >> ./common/kernel/Makefile
 
-# zram recomp 算法只能设备创建时固化（用户态无法在 swapon 前介入）
 apply_patch_file "other_patch/zram_recomp_default.patch" /tmp/zram_recomp.patch strict "zram 默认 zstd 重压缩算法补丁"
-# DAMON_RECLAIM min_age 120s -> 30s
 apply_patch_file "other_patch/damon_reclaim_defaults.patch" /tmp/damon_reclaim.patch strict "DAMON_RECLAIM 默认参数补丁"
 cat >> "$DCFG" << 'OEMDEPENDS'
 CONFIG_UBSAN=y
@@ -152,7 +142,7 @@ CONFIG_KUNIT=m
 CONFIG_KUNIT_DEBUGFS=y
 OEMDEPENDS
 
-# ===== cmdline 注入 =====
+# cmdline 注入
 info "对 init/main.c 注入 cmdline..."
 cd common
 TARGET_MAIN="init/main.c"
@@ -171,7 +161,7 @@ else
   exit 1
 fi
 
-# ===== 网络功能增强（纯 defconfig 注入） =====
+# 网络功能增强
 cd "$GITHUB_WORKSPACE/kernel_workspace"
 cat >> ./common/arch/arm64/configs/gki_defconfig << 'NETCFG'
 CONFIG_NETFILTER_XT_TARGET_HL=y
@@ -219,7 +209,7 @@ CONFIG_NET_SCH_FQ_CODEL=y
 CONFIG_TCP_CONG_CUBIC=y
 NETCFG
 
-# ===== Droidspaces 配置块 =====
+# Droidspaces 配置块
 if [[ "$DROIDSPACES_ENABLE" != "false" ]]; then
   cd "$GITHUB_WORKSPACE/kernel_workspace/common"
   cat >> ./arch/arm64/configs/gki_defconfig << 'DSCFG'
@@ -235,20 +225,19 @@ CONFIG_NTSYNC=y
 DSCFG
   if [[ "$DROIDSPACES_ENABLE" == "extend" ]]; then
     echo "CONFIG_BT_HCIVHCI=y" >> ./arch/arm64/configs/gki_defconfig
-    # EVDI/蓝牙等 extend 模块依赖动态 usermodehelper(modprobe),必须覆盖 OnePlus 默认 STATIC_USERMODEHELPER=y
     echo "CONFIG_STATIC_USERMODEHELPER=n" >> ./arch/arm64/configs/gki_defconfig
     echo "CONFIG_DRM_LINDROID_EVDI=y" >> ./arch/arm64/configs/gki_defconfig
   fi
 fi
 
-# ===== ADIOS 配置块 =====
+# ADIOS 配置块
 cd "$GITHUB_WORKSPACE/kernel_workspace"
 cat >> ./common/arch/arm64/configs/gki_defconfig << 'ADIOSCFG'
 CONFIG_MQ_IOSCHED_ADIOS=y
 CONFIG_MQ_IOSCHED_DEFAULT_ADIOS=y
 ADIOSCFG
 
-# ===== 版本固化 =====
+# 版本固化
 cd "$GITHUB_WORKSPACE/kernel_workspace"
 echo "CONFIG_LOCALVERSION_AUTO=y" >> ./common/arch/arm64/configs/gki_defconfig
 
@@ -257,17 +246,15 @@ if [[ -n "$UPSTREAM_SUBLEVEL" ]] && [[ "$UPSTREAM_SUBLEVEL" != "0" ]]; then
   LOCALVER="${LOCALVER}_${UPSTREAM_SUBLEVEL}"
 fi
 
-# 不假设 OEM 默认 LOCALVERSION 内容：清除所有旧值后写入实际后缀（替代硬编码 -4k 的 sed）
 sed -i '/^CONFIG_LOCALVERSION=/d' ./common/arch/arm64/configs/gki_defconfig
 echo "CONFIG_LOCALVERSION=\"${LOCALVER}\"" >> ./common/arch/arm64/configs/gki_defconfig
 
-# setlocalversion 替换任意位置的 echo "$res"
 for f in ./common/scripts/setlocalversion; do
   sed -i 's|^echo "\$res"$|echo "'"${LOCALVER}"'"|' "$f"
 done
 sed -i 's/${scm_version}//' ./common/scripts/setlocalversion
 
-# ===== HZ=300 =====
+# HZ=300
 info "启用 HZ=300..."
 cd "$GITHUB_WORKSPACE/kernel_workspace"
 cat >> ./common/arch/arm64/configs/gki_defconfig << 'HZ300CFG'
