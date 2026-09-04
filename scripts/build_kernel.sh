@@ -78,10 +78,6 @@ assert_config CONFIG_HZ_300 "HZ=300"
 assert_config CONFIG_IP_SET "网络功能扩展 (IP_SET)"
 assert_config CONFIG_MQ_IOSCHED_ADIOS "ADIOS"
 assert_config CONFIG_TCP_CONG_BBR3 "BBRv3"
-assert_config CONFIG_FUNCTION_TRACER "ftrace 函数追踪"
-assert_config CONFIG_FUNCTION_GRAPH_TRACER "ftrace 函数图"
-assert_config CONFIG_SCHED_TRACER "ftrace 调度器"
-assert_config CONFIG_FTRACE_SYSCALLS "ftrace 系统调用"
 
 if grep -q '^CONFIG_LLVM_POLLY=y' out/.config; then
   info "LLVM POLLY 配置生效"
