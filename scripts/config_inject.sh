@@ -263,4 +263,15 @@ CONFIG_HZ_300=y
 CONFIG_HZ=300
 HZ300CFG
 
+# ftrace 活体观测实验
+info "启用 ftrace 观测配置..."
+cat >> ./common/arch/arm64/configs/gki_defconfig << 'FTRACECFG'
+CONFIG_FUNCTION_TRACER=y
+CONFIG_FUNCTION_GRAPH_TRACER=y
+CONFIG_STACK_TRACER=y
+CONFIG_SCHED_TRACER=y
+CONFIG_FTRACE_SYSCALLS=y
+CONFIG_BLK_DEV_IO_TRACE=y
+FTRACECFG
+
 info "配置注入完成"
