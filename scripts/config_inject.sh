@@ -263,4 +263,6 @@ CONFIG_HZ_300=y
 CONFIG_HZ=300
 HZ300CFG
 
+echo "CONFIG_PER_VMA_LOCK_STATS=y" >> ./common/arch/arm64/configs/gki_defconfig
+
 info "配置注入完成"

@@ -78,6 +78,7 @@ assert_config CONFIG_HZ_300 "HZ=300"
 assert_config CONFIG_IP_SET "网络功能扩展 (IP_SET)"
 assert_config CONFIG_MQ_IOSCHED_ADIOS "ADIOS"
 assert_config CONFIG_TCP_CONG_BBR3 "BBRv3"
+assert_config CONFIG_PER_VMA_LOCK_STATS "per-VMA lock 统计"
 
 if grep -q '^CONFIG_LLVM_POLLY=y' out/.config; then
   info "LLVM POLLY 配置生效"
