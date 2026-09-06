@@ -1,12 +1,13 @@
 #!/bin/bash
 set -euo pipefail
 source "$(dirname "$0")/common.sh"
+cd "$GITHUB_WORKSPACE"
 
 # KPM 修补
 if [[ "$KPM_ENABLE" == 'builtin' ]] && ( [[ "$KSU_TYPE" == "sukisu" ]] || [[ "$KSU_TYPE" == "resukisu" ]] ); then
   info "应用 KPM 并修补内核..."
   cd kernel_workspace/common/out/arch/arm64/boot
-  curl -fSL --retry 3 --retry-delay 5 --retry-all-errors -o patch_linux "https://github.com/SukiSU-Ultra/SukiSU_KernelPatch_patch/releases/latest/download/patch_linux" || {
+  curl -fSL --retry 3 --retry-delay 5 --retry-all-errors --connect-timeout 10 --max-time 60 -o patch_linux "https://github.com/SukiSU-Ultra/SukiSU_KernelPatch_patch/releases/latest/download/patch_linux" || {
     error "KPM patch_linux 下载失败"
     exit 1
   }
@@ -137,18 +138,13 @@ fi
 
 # 本地工作区清理
 info "清理编译产出和临时文件..."
-rm -rf kernel_workspace/vendor_modules/out
+rm -rf "$GITHUB_WORKSPACE/kernel_workspace/vendor_modules/out"
 rm -f /tmp/*.patch
 ccache -c
 info "ccache 已裁剪至上限"
 for repo in "$HOME/.cache_patches/"*; do
   [ -d "$repo/.git" ] && git -C "$repo" gc --auto 2>/dev/null || true
 done
-if [[ -n "${PATCH_HASH:-}" ]] && [[ -n "${CFG_HASH:-}" ]]; then
-  mkdir -p "$HOME/.cache_patches"
-  printf '%s|%s' "$PATCH_HASH" "$CFG_HASH" > "$HOME/.cache_patches/build_state"
-  info "增量指纹+配置哈希已记录，下次相同状态将增量编译"
-fi
 
 if [ -s "$PENDING_SYNC" ]; then
   info "构建后补拉同步失败的上游仓库..."

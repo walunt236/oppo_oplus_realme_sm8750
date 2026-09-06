@@ -5,7 +5,7 @@ source "$(dirname "$0")/common.sh"
 cd "$GITHUB_WORKSPACE/kernel_workspace"
 DCFG="./common/arch/arm64/configs/gki_defconfig"
 
-if [[ "$SUSFS_ENABLE" == "true" ]]; then
+if [[ "$SUSFS_ENABLE" == "true" && "$KSU_TYPE" != "none" ]]; then
   cat >> "$DCFG" << 'SUSFSCFG'
 CONFIG_KSU_SUSFS=y
 CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y
@@ -242,17 +242,18 @@ cd "$GITHUB_WORKSPACE/kernel_workspace"
 echo "CONFIG_LOCALVERSION_AUTO=y" >> ./common/arch/arm64/configs/gki_defconfig
 
 LOCALVER="-${KERNEL_SUFFIX}"
-if [[ -n "$UPSTREAM_SUBLEVEL" ]] && [[ "$UPSTREAM_SUBLEVEL" != "0" ]]; then
+if [[ -z "$KERNEL_SUFFIX_INPUT" ]] && [[ -n "$UPSTREAM_SUBLEVEL" ]] && [[ "$UPSTREAM_SUBLEVEL" != "0" ]]; then
   LOCALVER="${LOCALVER}_${UPSTREAM_SUBLEVEL}"
 fi
+echo "LOCALVER=$LOCALVER" >> "$GITHUB_ENV"
 
 sed -i '/^CONFIG_LOCALVERSION=/d' ./common/arch/arm64/configs/gki_defconfig
 echo "CONFIG_LOCALVERSION=\"${LOCALVER}\"" >> ./common/arch/arm64/configs/gki_defconfig
 
 for f in ./common/scripts/setlocalversion; do
   sed -i 's|^echo "\$res"$|echo "'"${LOCALVER}"'"|' "$f"
+  grep -q "^echo \"${LOCALVER}\"$" "$f" || { error "setlocalversion 版本固化锚点未命中（上游已变动）"; exit 1; }
 done
-sed -i 's/${scm_version}//' ./common/scripts/setlocalversion
 
 # HZ=300
 info "启用 HZ=300..."

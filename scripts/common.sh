@@ -45,6 +45,7 @@ detect_proxy() {
   if curl -s -o /dev/null --connect-timeout 2 --max-time 3 --proxy http://127.0.0.1:7897 https://api.github.com 2>/dev/null; then
     echo "http_proxy=http://127.0.0.1:7897" >> "$GITHUB_ENV"
     echo "https_proxy=http://127.0.0.1:7897" >> "$GITHUB_ENV"
+    export http_proxy=http://127.0.0.1:7897 https_proxy=http://127.0.0.1:7897
     info "检测到本地代理 127.0.0.1:7897，网络操作走代理"
   else
     info "未检测到代理，纯直连模式（api/codeload/SSH443 直连可用，AOSP 走 gproxy 代理）"
@@ -65,9 +66,9 @@ retry() {
 
 fetch_gh_file() {
   local repo="$1" path="$2" ref="$3" out="$4"
-  curl -fsSL --retry 3 --retry-delay 5 -H "Authorization: token ${GH_TOKEN:-}" \
+  curl -fsSL --retry 3 --retry-delay 5 --connect-timeout 10 --max-time 60 -H "Authorization: token ${GH_TOKEN:-}" \
     "https://api.github.com/repos/$repo/contents/$path?ref=$ref" |
-    python3 -c "import sys,json,base64;open('$out','wb').write(base64.b64decode(json.load(sys.stdin)['content']))"
+    python3 -c "import sys,json,base64; c=json.load(sys.stdin); open('$out','wb').write(base64.b64decode(c['content']))"
 }
 
 find_latest() {
@@ -76,7 +77,7 @@ find_latest() {
 
 apply_patch_file() {
   local src="$1" out="$2" mode="$3" label="$4"
-  cp "$GITHUB_WORKSPACE/$src" "$out"
+  cp "$GITHUB_WORKSPACE/$src" "$out" || { warn "$label 源文件缺失，跳过"; return 0; }
   if ( cd ./common && patch -p1 -F 3 < "$out" ); then
     info "$label 应用成功"
   elif [[ "$mode" == "strict" ]]; then

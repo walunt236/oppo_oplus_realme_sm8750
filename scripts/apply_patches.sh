@@ -3,6 +3,7 @@ set -euo pipefail
 source "$(dirname "$0")/common.sh"
 
 cd "$GITHUB_WORKSPACE/kernel_workspace"
+: > /tmp/sync_failed.list
 
 count_rejs() {
   local label="$1" n
@@ -47,7 +48,7 @@ elif [[ "$KSU_TYPE" == "ksunext" ]]; then
   sync_repo "https://github.com/pershoot/KernelSU-Next.git" KernelSU-Next dev-susfs
   link_ksu_kernel KernelSU-Next
   cd KernelSU-Next
-  KSU_COMMITS=$(ksu_commit_count pershoot/KernelSU-Next dev)
+  KSU_COMMITS=$(ksu_commit_count pershoot/KernelSU-Next dev-susfs)
   KSU_COMMITS=${KSU_COMMITS:-0}
   if [[ "$KSU_COMMITS" == "0" ]]; then
     warn "KernelSU-Next 提交数获取失败，版本号降级为基线"
@@ -56,9 +57,11 @@ elif [[ "$KSU_TYPE" == "ksunext" ]]; then
   echo "KSUVER=$KSU_VERSION" >> "$GITHUB_ENV"
   echo "ksuver=$KSU_VERSION" >> "$GITHUB_OUTPUT"
   sed -i "s/KSU_VERSION_FALLBACK := 1/KSU_VERSION_FALLBACK := $KSU_VERSION/g" kernel/Kbuild
+  grep -q "KSU_VERSION_FALLBACK := $KSU_VERSION" kernel/Kbuild || warn "KSU_VERSION_FALLBACK 锚点未命中（上游 Kbuild 已变动）"
   KSU_GIT_TAG=$(curl -sL --retry 3 --retry-delay 5 --retry-all-errors "https://api.github.com/repos/KernelSU-Next/KernelSU-Next/tags" 2>/dev/null | grep -o '"name": *"[^"]*"' | head -n 1 | sed 's/"name": "//;s/"//' || true)
   if [[ -n "$KSU_GIT_TAG" ]]; then
     sed -i "s/KSU_VERSION_TAG_FALLBACK := v0.0.1/KSU_VERSION_TAG_FALLBACK := $KSU_GIT_TAG/g" kernel/Kbuild
+    grep -q "KSU_VERSION_TAG_FALLBACK := $KSU_GIT_TAG" kernel/Kbuild || warn "KSU_VERSION_TAG_FALLBACK 锚点未命中（上游 Kbuild 已变动）"
   fi
   cd ../common/drivers/kernelsu
   cp "$GITHUB_WORKSPACE/other_patch/apk_sign.patch" apk_sign.patch
@@ -77,6 +80,7 @@ elif [[ "$KSU_TYPE" == "ksu" ]]; then
   echo "KSUVER=$KSU_VERSION" >> "$GITHUB_ENV"
   echo "ksuver=$KSU_VERSION" >> "$GITHUB_OUTPUT"
   sed -i "s/DKSU_VERSION=16/DKSU_VERSION=${KSU_VERSION}/" kernel/Kbuild
+  grep -q "DKSU_VERSION=${KSU_VERSION}" kernel/Kbuild || warn "DKSU_VERSION 锚点未命中（上游 Kbuild 已变动）"
 else
   info "跳过 KernelSU 配置"
   echo "KSUVER=none" >> "$GITHUB_ENV"
@@ -98,7 +102,15 @@ if [[ "$LZ4KD_ENABLE" == "true" ]]; then
   sync_repo "https://github.com/ShirkNeko/SukiSU_patch.git" "$SUKI_CACHE_DIR" || true &
 fi
 sync_repo "https://github.com/WildKernels/kernel_patches.git" "$WILD_DIR" || true &
-wait || die "补丁仓预取失败"
+wait
+[ -d "$ZRAM_CACHE_DIR/.git" ] || die "zram_patches 预取失败（克隆失败且无本地缓存）"
+[ -d "$WILD_DIR/.git" ] || die "wild_patches 预取失败（克隆失败且无本地缓存）"
+if [[ "$SUSFS_ENABLE" == "true" && "$KSU_TYPE" != "none" ]] && [ ! -d "$SUSFS_CACHE_DIR/.git" ]; then
+  die "susfs4ksu 预取失败（克隆失败且无本地缓存）"
+fi
+if [[ "$LZ4KD_ENABLE" == "true" ]] && [ ! -d "$SUKI_CACHE_DIR/.git" ]; then
+  die "SukiSU_patch 预取失败（克隆失败且无本地缓存）"
+fi
 info "补丁仓并行预取完成"
 
 # SUSFS
@@ -121,6 +133,7 @@ if [[ "$SUSFS_ENABLE" == "true" ]]; then
     sed -i -e '/int ret = 0, copied = 0;/a \    unsigned int nr_subpages = __PAGE_SIZE / PAGE_SIZE;' -e '/int ret = 0, copied = 0;/a \    pagemap_entry_t *res = NULL;' ./fs/proc/task_mmu.c || true
 
     patch -p1 < 50_add_susfs_in_gki-android15-6.6.patch || {
+      sed -i '/^    unsigned int nr_subpages = __PAGE_SIZE \/ PAGE_SIZE;$/d; /^    pagemap_entry_t \*res = NULL;$/d' ./fs/proc/task_mmu.c || true
       error "SUSFS 核心补丁应用失败"
       exit 1
     }
@@ -135,7 +148,7 @@ if [[ "$SUSFS_ENABLE" == "true" ]]; then
 
   if [[ "$KSU_TYPE" == "ksu" ]]; then
     info "为原版 KernelSU 添加补丁..."
-    cp ./susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./KernelSU/
+    cp ./susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./KernelSU/ || warn "susfs-ksu 补丁文件缺失，跳过补丁应用"
     cd ./KernelSU
     patch -p1 < 10_enable_susfs_for_ksu.patch || true
   fi
@@ -164,7 +177,7 @@ cp "$ACCEL_DIR/lz4accel.h" fs/f2fs/lz4armv8/
 git apply --reject --whitespace=nowarn 001-lz4.patch || true
 patch -p1 -t -F 3 < 002-zstd.patch || true
 
-if [ -f lib/lz4/lz4armv8/lz4armv8.S ] && [ -f lib/zstd/zstd_common_module.c ]; then
+if [ -f lib/lz4/lz4armv8/lz4armv8.S ] && [ -f lib/zstd/zstd_common_module.c ] && [ -s fs/f2fs/lz4armv8/lz4accel.c ] && [ -s fs/f2fs/lz4armv8/lz4accel.h ]; then
   info "lz4 NEON 解压 + zstd 就位"
 else
   error "lz4/zstd 补丁未生效（lz4armv8.S/zstd 缺失），中止构建"
@@ -206,6 +219,7 @@ info "匹配风驰补丁: $PATCH_FILE"
 sed -i 's/\r$//' "$PATCH_FILE"
 
 cd common
+find . -name "*.rej" -delete 2>/dev/null || true
 
 info "注入风驰引擎补丁..."
 patch -p1 -F 3 -f < "$PATCH_FILE" || true
@@ -432,5 +446,5 @@ done
 
 info "调度器优化完成 (16ms PELT / NEXT_BUDDY / HRTICK / SIS_PROP)"
 
-touch /tmp/sync_failed.list
-cp /tmp/sync_failed.list "$PENDING_SYNC"
+touch /tmp/sync_failed.list "$PENDING_SYNC"
+sort -u "$PENDING_SYNC" /tmp/sync_failed.list -o "$PENDING_SYNC"

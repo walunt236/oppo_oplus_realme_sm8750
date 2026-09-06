@@ -4,7 +4,7 @@ source "$(dirname "$0")/common.sh"
 
 # 增量编译 mtime 钳制
 cd "$GITHUB_WORKSPACE/kernel_workspace/common"
-PATCH_HASH=$(git status --porcelain 2>/dev/null | md5sum | cut -d' ' -f1)
+PATCH_HASH=$(git status --porcelain 2>/dev/null | md5sum | cut -d' ' -f1 || true)
 echo "PATCH_HASH=$PATCH_HASH" >> "$GITHUB_ENV"
 STORED=$(cut -d'|' -f1 "$HOME/.cache_patches/build_state" 2>/dev/null || true)
 if [[ "$STORED" == "$PATCH_HASH" ]]; then
@@ -44,14 +44,14 @@ make_defconfig() {
 
 make_defconfig
 
-CFG_HASH=$(md5sum out/.config | cut -d' ' -f1)
+CFG_HASH=$(md5sum out/.config | cut -d' ' -f1 || true)
 echo "CFG_HASH=$CFG_HASH" >> "$GITHUB_ENV"
 STORED_CFG=$(cut -d'|' -f2 "$HOME/.cache_patches/build_state" 2>/dev/null || true)
 if [[ "$STORED_CFG" != "$CFG_HASH" ]]; then
   info ".config 与上次成功构建不一致，强制全量重建（避免增量配置陈旧）..."
   rm -rf out
   make_defconfig
-  CFG_HASH=$(md5sum out/.config | cut -d' ' -f1)
+  CFG_HASH=$(md5sum out/.config | cut -d' ' -f1 || true)
   echo "CFG_HASH=$CFG_HASH" >> "$GITHUB_ENV"
 fi
 
@@ -161,7 +161,7 @@ if [ -n "$AFDO_PROFILE" ] && [ -f /home/dev/pgo/vmlinux ]; then
   NM="$HOME/.toolchains/Clang-19.0.0git-20240723/bin/llvm-nm"
   "$PROFDATA" show -sample "$AFDO_PROFILE" 2>/dev/null | grep '^Function: ' | awk '{print $2}' | sed 's/:.*//' | sort -u > /tmp/afdo_funcs.txt || true
   "$NM" --defined-only /home/dev/pgo/vmlinux 2>/dev/null | awk '$2 ~ /^[tT]$/ {print $3}' | sort -u > /tmp/vmlinux_funcs.txt || true
-  MATCH=$(comm -12 /tmp/afdo_funcs.txt /tmp/vmlinux_funcs.txt | wc -l)
+  MATCH=$(comm -12 /tmp/afdo_funcs.txt /tmp/vmlinux_funcs.txt | wc -l || true)
   TOTAL=$(wc -l < /tmp/afdo_funcs.txt)
   if [ "$TOTAL" -gt 0 ]; then
     RATE=$(awk -v m="$MATCH" -v t="$TOTAL" 'BEGIN{printf "%.1f", m*100/t}')
@@ -170,11 +170,14 @@ if [ -n "$AFDO_PROFILE" ] && [ -f /home/dev/pgo/vmlinux ]; then
       warn "profile 匹配率 <50%——内核已演进，建议重新采样重建 profile"
     fi
   fi
+elif [ -n "$AFDO_PROFILE" ]; then
+  warn "AutoFDO 新鲜度防线未启用（/home/dev/pgo/vmlinux 缺失）"
 fi
 # 编译器参数官方工具链支持验证
 info "编译器参数支持验证（ZyCromerZ clang 19 官方工具链）:"
 if clang -mcpu=oryon-1 -### -c /dev/null 2>&1 | grep -qE "error|unknown|not supported"; then
   echo "  ✗ -mcpu=oryon-1 不被工具链支持！" | tee -a "$LOG_FILE"
+  exit 1
 else
   echo "  ✓ -mcpu=oryon-1（Oryon 目标）" | tee -a "$LOG_FILE"
 fi
@@ -254,7 +257,12 @@ if [ -f out/arch/arm64/boot/Image ]; then
   assert_ikcfg CONFIG_HZ_300
   assert_ikcfg CONFIG_TCP_CONG_BBR3
   assert_ikcfg CONFIG_IP_SET
-  info "Image 内嵌配置校验通过 (ZRAM_MEMORY_TRACKING/AUTOFDO_CLANG/HZ_300/BBR3/IP_SET)"
+  assert_ikcfg CONFIG_LTO_CLANG_THIN
+  assert_ikcfg CONFIG_MQ_IOSCHED_ADIOS
+  assert_ikcfg CONFIG_SECTION_MISMATCH_WARN_ONLY
+  assert_ikcfg CONFIG_PER_VMA_LOCK_STATS
+  grep -qF "CONFIG_LOCALVERSION=\"${LOCALVER}\"" <<< "$IKCFG_TEXT" || die "Image 内嵌 LOCALVERSION 与预期不符（期望 ${LOCALVER}），产物配置陈旧，中止"
+  info "Image 内嵌配置校验通过"
 fi
 
 info "内核镜像编译完成"
@@ -266,3 +274,9 @@ fi
 
 grep "CONFIG_IP6_NF_NAT" out/.config 2>/dev/null || echo "CONFIG_IP6_NF_NAT: not set"
 ccache --show-stats
+
+if [[ -n "${PATCH_HASH:-}" ]] && [[ -n "${CFG_HASH:-}" ]]; then
+  mkdir -p "$HOME/.cache_patches"
+  printf '%s|%s' "$PATCH_HASH" "$CFG_HASH" > "$HOME/.cache_patches/build_state"
+  info "增量指纹+配置哈希已记录，下次相同状态将增量编译"
+fi

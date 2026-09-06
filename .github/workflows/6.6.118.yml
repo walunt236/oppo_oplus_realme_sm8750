@@ -113,7 +113,6 @@ jobs:
       REKERNEL_ENABLE: ${{ inputs.rekernel_enable }}
       BASEBAND_GUARD: ${{ inputs.baseband_guard }}
       RCU_NOCB_ENABLE: ${{ inputs.rcu_nocb_enable }}
-      CCACHE_UPDATE: ${{ inputs.ccache_update }}
       CCACHE_DEBUG_INPUT: ${{ inputs.ccache_debug }}
       KERNEL_SUFFIX_INPUT: ${{ inputs.kernel_suffix }}
       DIAGNOSIS: ${{ inputs.diagnosis }}
@@ -153,7 +152,7 @@ jobs:
       - name: 清除旧 ccache 缓存
         if: inputs.ccache_update
         run: |
-          if gh cache delete ${{ env.CCACHE_REAL_KEY }}-${{ runner.os }}-${{ github.ref_name }} -R ${{ github.repository }}; then
+          if gh cache delete "${{ env.CCACHE_REAL_KEY }}-${{ runner.os }}-${{ github.ref_name }}" -R "${{ github.repository }}"; then
             echo "[INFO] 旧 ccache 缓存删除成功"
           else
             echo "[INFO] 旧 ccache 缓存清理跳过"
@@ -179,7 +178,7 @@ jobs:
           AFDO_HASH=$(md5sum "$AFDO_DIR/kernel.afdo" | cut -c1-8)
           AFDO_LINK="$AFDO_DIR/kernel-$AFDO_HASH.afdo"
           ln -sf kernel.afdo "$AFDO_LINK"
-          echo "AFDO_PROFILE=$AFDO_LINK" >> $GITHUB_ENV
+          echo "AFDO_PROFILE=$AFDO_LINK" >> "$GITHUB_ENV"
           echo "[INFO] AutoFDO profile 就绪: $AFDO_LINK (hash=$AFDO_HASH)" | tee -a "$LOG_FILE"
 
       - name: 编译内核

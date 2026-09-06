@@ -41,7 +41,7 @@ fi
 
 if ! command -v ccache >/dev/null 2>&1; then
   info "ccache 未安装，正在下载..."
-  wget -q "https://github.com/$GITHUB_REPOSITORY/raw/refs/heads/$GITHUB_REF_NAME/lib/ccache-x86-64" -O ccache
+  wget -q --timeout=30 "https://github.com/$GITHUB_REPOSITORY/raw/refs/heads/$GITHUB_REF_NAME/lib/ccache-x86-64" -O ccache || die "ccache 下载失败"
   sudo cp -f ./ccache /usr/bin/ccache
   sudo chmod +x /usr/bin/ccache
   rm -f ./ccache
@@ -104,6 +104,7 @@ info "拉取 Google AOSP android15-6.6 ..."
 wait $AOSP_TAG_PID 2>/dev/null || true
 LATEST_AOSP_TAG=$(cat "$HOME/.cache_patches/latest_aosp_tag" 2>/dev/null)
 LATEST_AOSP_TAG=${LATEST_AOSP_TAG:-android15-6.6}
+grep -qE '^android15-6\.6(\.[0-9]+_r[0-9]+)?$' <<< "$LATEST_AOSP_TAG" || { warn "AOSP 标签格式异常: $LATEST_AOSP_TAG，回退 android15-6.6"; LATEST_AOSP_TAG=android15-6.6; }
 info "AOSP 最新发布标签: $LATEST_AOSP_TAG"
 FETCH_OK=0
 for i in 1 2 3; do
@@ -180,7 +181,7 @@ if [ ! -d "$TC_DIR/bin" ]; then
   rm -rf "$TC_DIR"
   mkdir -p "$TC_DIR"
   rm -f clang19.tar.gz*  # 清 aria2c 中断分片（曾累积 4.7G 残留）
-  aria2c -s16 -x16 -k1M "$CLANG_URL" -o clang19.tar.gz
+  aria2c -s16 -x16 -k1M "$CLANG_URL" -o clang19.tar.gz || die "Clang 19 下载失败"
   tar -xzf clang19.tar.gz -C "$TC_DIR" && rm -f clang19.tar.gz
 else
   info "[秒过] Clang 19 工具链已存在本地缓存，直接复用！"
@@ -193,7 +194,7 @@ if [ ! -d "$BT_DIR/build-tools/bin" ]; then
   rm -f build-tools*.tar.gz*  # 清 aria2c 中断分片（曾累积 18G 残留）
   aria2c -s16 -x16 -k1M \
     "https://android.googlesource.com/platform/prebuilts/build-tools/+archive/refs/heads/main/linux-x86.tar.gz" \
-    -o build-tools.tar.gz
+    -o build-tools.tar.gz || die "build-tools 下载失败"
   tar -xzf build-tools.tar.gz -C "$BT_DIR/build-tools" && rm -f build-tools.tar.gz
 else
   info "[秒过] build-tools 工具链已存在本地缓存，直接复用！"
