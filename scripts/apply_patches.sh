@@ -177,7 +177,7 @@ cp "$ACCEL_DIR/lz4accel.h" fs/f2fs/lz4armv8/
 git apply --reject --whitespace=nowarn 001-lz4.patch || true
 patch -p1 -t -F 3 < 002-zstd.patch || true
 
-if [ -f lib/lz4/lz4armv8/lz4armv8.S ] && [ -f lib/zstd/zstd_common_module.c ] && [ -s fs/f2fs/lz4armv8/lz4accel.c ] && [ -s fs/f2fs/lz4armv8/lz4accel.h ]; then
+if [ -f lib/lz4/lz4armv8/lz4armv8.S ] && [ -f lib/zstd/zstd_common_module.c ] && [ -s lib/lz4/lz4armv8/lz4accel.c ] && [ -s lib/lz4/lz4armv8/lz4accel.h ]; then
   info "lz4 NEON 解压 + zstd 就位"
 else
   error "lz4/zstd 补丁未生效（lz4armv8.S/zstd 缺失），中止构建"
