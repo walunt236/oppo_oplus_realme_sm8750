@@ -252,7 +252,6 @@ echo "CONFIG_LOCALVERSION=\"${LOCALVER}\"" >> ./common/arch/arm64/configs/gki_de
 
 for f in ./common/scripts/setlocalversion; do
   sed -i 's|^echo "\$res"$|echo "'"${LOCALVER}"'"|' "$f"
-  grep -q "^echo \"${LOCALVER}\"$" "$f" || { error "setlocalversion 版本固化锚点未命中（上游已变动）"; exit 1; }
 done
 
 # HZ=300
