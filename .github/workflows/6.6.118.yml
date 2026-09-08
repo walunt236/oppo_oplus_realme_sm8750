@@ -131,7 +131,7 @@ jobs:
           git reset --hard FETCH_HEAD
           git clean -fdq -e kernel_workspace
 
-      - name: 环境初始化（依赖/源码/工具链）
+      - name: 环境初始化
         id: init_env
         run: bash "$GITHUB_WORKSPACE/scripts/init_env.sh"
 
@@ -158,10 +158,10 @@ jobs:
             echo "[INFO] 旧 ccache 缓存清理跳过"
           fi
 
-      - name: 应用补丁（KernelSU/SUSFS/lz4/风驰/功能开关）
+      - name: 应用补丁
         run: bash "$GITHUB_WORKSPACE/scripts/apply_patches.sh"
 
-      - name: 注入配置（defconfig/cmdline/版本固化）
+      - name: 注入配置
         run: bash "$GITHUB_WORKSPACE/scripts/config_inject.sh"
 
       - name: 准备 AutoFDO profile
