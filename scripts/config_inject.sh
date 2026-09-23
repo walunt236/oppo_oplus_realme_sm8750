@@ -60,7 +60,6 @@ echo "CONFIG_SECTION_MISMATCH_WARN_ONLY=y" >> "$DCFG"
 
 echo 'CONFIG_ZRAM=y' >> "$DCFG"
 echo 'CONFIG_ZRAM_MEMORY_TRACKING=y' >> "$DCFG"
-echo 'CONFIG_RANDOMIZE_KSTACK_OFFSET_DEFAULT=y' >> "$DCFG"
 echo 'CONFIG_IOMMU_DEFAULT_DMA_STRICT=y' >> "$DCFG"
 
 cat >> "$DCFG" << 'TUNECFG'
@@ -85,7 +84,7 @@ CONFIG_THP_SWAP=y
 CONFIG_NET_SCH_ETS=y
 CONFIG_ZSTD_COMPRESS=y
 CONFIG_ZSTD_DECOMPRESS=y
-CONFIG_SLAB_MERGE_DEFAULT=y
+CONFIG_SLAB_MERGE_DEFAULT=n
 CONFIG_F2FS_FS_LZ4=y
 CONFIG_F2FS_FS_LZ4HC=y
 CONFIG_F2FS_FS_ZSTD=y
@@ -93,7 +92,6 @@ CONFIG_EROFS_FS_ZIP_LZMA=y
 CONFIG_EROFS_FS_ZIP_DEFLATE=y
 CONFIG_ARM64_NEON=y
 CONFIG_ARM64_SIMD=y
-CONFIG_ARM_SPE_PMU=y
 CONFIG_LRU_GEN=y
 CONFIG_LRU_GEN_ENABLED=y
 CONFIG_DAMON_PADDR=y
@@ -104,15 +102,7 @@ CONFIG_SECURITY_LANDLOCK=y
 TUNECFG
 
 if [[ "$RCU_NOCB_ENABLE" == "true" ]]; then
-  info "开启 RCU_NOCB_CPU..."
-  cat >> "$DCFG" << 'RCUCFG'
-CONFIG_RCU_EXPERT=y
-CONFIG_RCU_NOCB_CPU=y
-CONFIG_RCU_NOCB_CPU_DEFAULT_ALL=y
-CONFIG_RCU_LAZY_DEFAULT_OFF=n
-CONFIG_RCU_NOCB_CPU_CB_BOOST=y
-RCUCFG
-  info "RCU_LAZY 默认启用"
+  info "RCU_NOCB 已停用（A类归零测试）"
 fi
 
 cat >> "$DCFG" << 'NSCFG'
@@ -148,15 +138,6 @@ TARGET_MAIN="init/main.c"
 
 if [ ! -f "$TARGET_MAIN" ]; then
   error "无法定位内核入口文件 $TARGET_MAIN"
-  exit 1
-fi
-
-sed -i '/setup_arch(&command_line);/a \    strlcat(boot_command_line, " schedstats=disable panic=30 page_alloc.shuffle=1 cryptomgr.notests rcutree.blimit=1024 workqueue.power_efficient=1 skew_tick=0 random.trust_cpu=on kfence.sample_interval=0 loglevel=3 transparent_hugepage=madvise", sizeof(boot_command_line));' "$TARGET_MAIN"
-
-if grep -q "strlcat.*boot_command_line" "$TARGET_MAIN"; then
-  info "cmdline 注入成功"
-else
-  error "cmdline 注入失败"
   exit 1
 fi
 
@@ -253,14 +234,13 @@ for f in ./common/scripts/setlocalversion; do
   sed -i 's|^echo "\$res"$|echo "'"${LOCALVER}"'"|' "$f"
 done
 
-# HZ=300
-info "启用 HZ=300..."
+# HZ=250
+info "启用 HZ=250..."
 cd "$GITHUB_WORKSPACE/kernel_workspace"
-cat >> ./common/arch/arm64/configs/gki_defconfig << 'HZ300CFG'
-# CONFIG_HZ_250 is not set
-CONFIG_HZ_300=y
-CONFIG_HZ=300
-HZ300CFG
+cat >> ./common/arch/arm64/configs/gki_defconfig << 'HZ250CFG'
+CONFIG_HZ_250=y
+CONFIG_HZ=250
+HZ250CFG
 
 echo "CONFIG_PER_VMA_LOCK_STATS=y" >> ./common/arch/arm64/configs/gki_defconfig
 

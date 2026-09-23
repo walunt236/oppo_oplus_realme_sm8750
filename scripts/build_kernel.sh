@@ -74,7 +74,7 @@ fi
 assert_config CONFIG_AUTOFDO_CLANG "AutoFDO (AUTOFDO_CLANG)"
 assert_config CONFIG_SECTION_MISMATCH_WARN_ONLY "SECTION_MISMATCH_WARN_ONLY (modpost mismatch 降级警告)"
 assert_config CONFIG_LTO_CLANG_THIN "ThinLTO"
-assert_config CONFIG_HZ_300 "HZ=300"
+assert_config CONFIG_HZ_250 "HZ=250"
 assert_config CONFIG_IP_SET "网络功能扩展 (IP_SET)"
 assert_config CONFIG_MQ_IOSCHED_ADIOS "ADIOS"
 assert_config CONFIG_TCP_CONG_BBR3 "BBRv3"
@@ -255,7 +255,7 @@ if [ -f out/arch/arm64/boot/Image ]; then
   fi
   assert_ikcfg CONFIG_ZRAM_MEMORY_TRACKING
   assert_ikcfg CONFIG_AUTOFDO_CLANG
-  assert_ikcfg CONFIG_HZ_300
+  assert_ikcfg CONFIG_HZ_250
   assert_ikcfg CONFIG_TCP_CONG_BBR3
   assert_ikcfg CONFIG_IP_SET
   assert_ikcfg CONFIG_LTO_CLANG_THIN
