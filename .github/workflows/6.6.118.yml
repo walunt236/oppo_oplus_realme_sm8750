@@ -169,10 +169,10 @@ jobs:
           AFDO_DIR="$HOME/.cache_patches/afdo"
           mkdir -p "$AFDO_DIR"
           if [ ! -s "$AFDO_DIR/kernel.afdo" ]; then
-            echo "[ERROR] AutoFDO profile 缺失" | tee -a "$LOG_FILE"
-            echo "[ERROR] 请先自采集 profile：设备采样 → build_afdo.py 解析 → llvm-profdata merge → cp 到 $AFDO_DIR/kernel.afdo" | tee -a "$LOG_FILE"
-            echo "[ERROR] 注意：云端 runner（ubuntu-latest）无长期缓存，AutoFDO 构建仅 self-hosted 可用" | tee -a "$LOG_FILE"
-            exit 1
+            echo "[WARN] 未找到 AutoFDO profile，本次构建跳过 AutoFDO 优化" | tee -a "$LOG_FILE"
+            echo "[WARN] 需要时把采样文件放到 $AFDO_DIR/kernel.afdo 即可自动启用" | tee -a "$LOG_FILE"
+            echo "AFDO_PROFILE=" >> "$GITHUB_ENV"
+            exit 0
           fi
 
           AFDO_HASH=$(md5sum "$AFDO_DIR/kernel.afdo" | cut -c1-8)
