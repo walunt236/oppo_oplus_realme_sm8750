@@ -1,0 +1,8 @@
+name: ping
+on:
+  workflow_dispatch:
+jobs:
+  ping:
+    runs-on: self-hosted
+    steps:
+      - run: echo "pong"
