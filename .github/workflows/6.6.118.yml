@@ -74,6 +74,15 @@ on:
         required: true
         type: boolean
         default: false
+      afdo:
+        description: 'AutoFDO（auto=有采样文件就启用，on=强制，off=关闭）'
+        required: true
+        type: choice
+        default: 'auto'
+        options:
+          - 'auto'
+          - 'on'
+          - 'off'
       kernel_suffix:
         description: '内核后缀'
         required: false
@@ -118,6 +127,7 @@ jobs:
       DIAGNOSIS: ${{ inputs.diagnosis }}
       O3_SELECTIVE: ${{ inputs.o3_selective }}
       CLEAN_BUILD: ${{ inputs.clean_build }}
+      AFDO_MODE: ${{ inputs.afdo }}
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: 同步仓库代码
@@ -168,7 +178,16 @@ jobs:
         run: |
           AFDO_DIR="$HOME/.cache_patches/afdo"
           mkdir -p "$AFDO_DIR"
+          if [ "$AFDO_MODE" = "off" ]; then
+            echo "[INFO] AFDO 已关闭（afdo=off），跳过 AutoFDO" | tee -a "$LOG_FILE"
+            echo "AFDO_PROFILE=" >> "$GITHUB_ENV"
+            exit 0
+          fi
           if [ ! -s "$AFDO_DIR/kernel.afdo" ]; then
+            if [ "$AFDO_MODE" = "on" ]; then
+              echo "[ERROR] afdo=on 但没有采样文件：$AFDO_DIR/kernel.afdo" | tee -a "$LOG_FILE"
+              exit 1
+            fi
             echo "[WARN] 未找到 AutoFDO profile，本次构建跳过 AutoFDO 优化" | tee -a "$LOG_FILE"
             echo "[WARN] 需要时把采样文件放到 $AFDO_DIR/kernel.afdo 即可自动启用" | tee -a "$LOG_FILE"
             echo "AFDO_PROFILE=" >> "$GITHUB_ENV"
