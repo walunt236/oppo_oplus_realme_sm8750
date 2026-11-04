@@ -125,24 +125,16 @@ rm -f ../AnyKernel3-*.zip
 zip -r "../$AK3_NAME" ./*
 echo "ak3name=$AK3_NAME" >> "$GITHUB_OUTPUT"
 
-if [[ "$RUNNER_TYPE" == "self-hosted" ]]; then
-  # 输出目录优先级：显式指定 > WSL 的 /mnt/d > 用户家目录
-  if [ -n "${OUT_DIR:-}" ]; then
-    TARGET_DIR="$OUT_DIR"
-  elif [ -d /mnt/d ]; then
-    TARGET_DIR="/mnt/d/AK3_DOC"
-  else
-    TARGET_DIR="$HOME/ak3-out"
+# 产物输出目录：build.env 的 OUT_DIR（默认 $HOME/ak3-out）
+TARGET_DIR="${OUT_DIR:-$HOME/ak3-out}"
+if mkdir -p "$TARGET_DIR" 2>/dev/null; then
+  if [ -f "$TARGET_DIR/$AK3_NAME" ]; then
+    mv -f "$TARGET_DIR/$AK3_NAME" "$TARGET_DIR/$AK3_NAME.prev"
+    info "旧包已备份: $AK3_NAME.prev"
   fi
-  if mkdir -p "$TARGET_DIR" 2>/dev/null; then
-    if [ -f "$TARGET_DIR/$AK3_NAME" ]; then
-      mv -f "$TARGET_DIR/$AK3_NAME" "$TARGET_DIR/$AK3_NAME.prev"
-      info "旧包已备份: $AK3_NAME.prev"
-    fi
-    cp "../$AK3_NAME" "$TARGET_DIR/" && info "已保存至: $TARGET_DIR/$AK3_NAME"
-  else
-    warn "无法写入 $TARGET_DIR，ZIP 保留在工作区"
-  fi
+  cp "../$AK3_NAME" "$TARGET_DIR/" && info "已保存至: $TARGET_DIR/$AK3_NAME"
+else
+  warn "无法写入 $TARGET_DIR，ZIP 保留在工作区"
 fi
 
 # 本地工作区清理
