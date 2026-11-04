@@ -41,6 +41,12 @@ fi
 
 make_defconfig() {
   make -j${BUILD_JOBS} LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" LD="ld.lld" HOSTLD=ld.lld O=out gki_defconfig
+  # CONFIG_HEADERS_INSTALL=n 时 out/usr/include 不会生成；若上次残留了它，
+  # KernelSU 的 Kbuild 会误判 preinit 可用，导致链接期 undefined symbol。
+  # 这里显式清掉，让状态不依赖 out/ 的历史残留。
+  if ! grep -q '^CONFIG_HEADERS_INSTALL=y' out/.config; then
+    rm -rf out/usr/include
+  fi
 }
 
 make_defconfig
