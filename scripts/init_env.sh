@@ -3,7 +3,6 @@ set -euo pipefail
 source "$(dirname "$0")/common.sh"
 
 export GIT_TERMINAL_PROMPT=0
-detect_proxy
 
 echo "=== 内核构建关键状态日志汇总 ===" > "$LOG_FILE"
 info "清理可能残留的后台进程"
@@ -17,26 +16,22 @@ cd "$GITHUB_WORKSPACE"
 mkdir -p kernel_workspace
 cd kernel_workspace
 
-if [[ "$RUNNER_TYPE" == "ubuntu-latest" ]]; then
-  info "检测到 GitHub 云端环境，执行系统依赖安装及预置优化..."
-  sudo apt-mark hold firefox || true
-  sudo apt-mark hold libc-bin || true
-  sudo apt purge -y man-db || true
-  sudo rm -rf /var/lib/man-db/auto-update
-  sudo apt-get update
-  sudo apt-get install -y --no-install-recommends \
-    binutils python-is-python3 libssl-dev libelf-dev aria2
+info "检查构建依赖..."
+MISSING_PKGS=""
+for pkg in build-essential bc bison flex libssl-dev libelf-dev libncurses-dev \
+           python3 python-is-python3 dwarves git curl wget aria2 zip unzip \
+           zstd xz-utils ca-certificates cpio rsync kmod; do
+  dpkg -s "$pkg" >/dev/null 2>&1 || MISSING_PKGS="$MISSING_PKGS $pkg"
+done
+if [ -n "$MISSING_PKGS" ]; then
+  info "安装缺失依赖:$MISSING_PKGS"
+  sudo apt-get update -q
+  sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q --no-install-recommends $MISSING_PKGS || {
+    error "构建依赖安装失败"
+    exit 1
+  }
 else
-  info "检测到 本地 self-hosted (WSL2) 环境，跳过危险修改..."
-  for pkg in binutils python3 libssl-dev libelf-dev aria2 wget zip zstd libxml2-dev unzip; do
-    if ! dpkg -l "$pkg" >/dev/null 2>&1 && ! command -v "$pkg" >/dev/null 2>&1; then
-      warn "缺少依赖: $pkg，尝试安装..."
-      sudo apt-get install -y --no-install-recommends "$pkg" || {
-        error "依赖 $pkg 安装失败，请手动安装"
-        exit 1
-      }
-    fi
-  done
+  info "构建依赖齐全"
 fi
 
 if ! command -v ccache >/dev/null 2>&1; then
@@ -210,16 +205,6 @@ echo "BT_DIR_NAME=build-tools-main" >> "$GITHUB_ENV"
 rm -f "$BT_DIR/build-tools/bin/bison"
 
 
-if [[ "$RUNNER_TYPE" == "ubuntu-latest" ]]; then
-  if ! dpkg -l binutils python3 libssl-dev libelf-dev >/dev/null 2>&1; then
-    warn "云端依赖安装异常，正在重试..."
-    sudo apt-get install -y --no-install-recommends \
-      binutils python-is-python3 libssl-dev libelf-dev || {
-      error "云端依赖安装失败"
-      exit 1
-    }
-  fi
-fi
 rm -f common/android/abi_gki_protected_exports_* || true
 sed -i 's/protected_modules = \[.*\]/protected_modules = []/' common/modules.bzl || true
 sed -i 's/ -dirty//g' common/scripts/setlocalversion
