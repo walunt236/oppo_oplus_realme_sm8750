@@ -10,7 +10,7 @@ mkdir -p "$REJ_DIR"
 
 count_rejs() {
   local label="$1" files hunks safe
-  safe="${label//$/_}"
+  safe="${label//\//_}"
   files=$(find . -name "*.rej" 2>/dev/null | wc -l)
   hunks=$(find . -name "*.rej" -exec awk '/^@@/{n++} END{print n+0}' {} \; 2>/dev/null | awk '{s+=$1} END{print s+0}')
   if [ "$files" -gt 0 ]; then
