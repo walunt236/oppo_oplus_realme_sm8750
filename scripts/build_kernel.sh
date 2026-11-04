@@ -40,7 +40,7 @@ if [[ "$CLEAN_BUILD" == "true" ]]; then
 fi
 
 make_defconfig() {
-  make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" LD="ld.lld" HOSTLD=ld.lld O=out gki_defconfig
+  make -j${BUILD_JOBS} LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" LD="ld.lld" HOSTLD=ld.lld O=out gki_defconfig
 }
 
 make_defconfig
@@ -124,14 +124,6 @@ load_toolchain_env
 
 cd kernel_workspace/common
 
-if [[ "$RUNNER_TYPE" == "ubuntu-latest" ]]; then
-  info "清理云端磁盘空间..."
-  sudo rm -rf /usr/share/dotnet &
-  sudo rm -rf /usr/local/lib/android &
-  sudo rm -rf /opt/ghc &
-  sudo rm -rf /opt/hostedtoolcache/CodeQL &
-  wait
-fi
 
 export SOURCE_DATE_EPOCH=$(date +%s)
 export KBUILD_BUILD_TIMESTAMP="$(date -u)"
@@ -141,7 +133,7 @@ export KBUILD_BUILD_HOST="ubuntu-build"
 mkdir -p "$HOME/.thinlto-cache"
 cat << 'EOF' > ld-wrapper
 #!/bin/sh
-exec ld.lld --thinlto-cache-dir="$HOME/.thinlto-cache" --thinlto-jobs="$(nproc --all)" "$@"
+exec ld.lld --thinlto-cache-dir="$HOME/.thinlto-cache" --thinlto-cache-policy=cache_size_bytes=4g --thinlto-jobs="$(nproc --all)" "$@"
 EOF
 chmod +x ld-wrapper
 
@@ -158,11 +150,11 @@ info "链接器版本检查："
 ld.lld --version
 
 # AutoFDO profile 新鲜度检测
-if [ -n "$AFDO_PROFILE" ] && [ -f /home/dev/pgo/vmlinux ]; then
+if [ -n "$AFDO_PROFILE" ] && [ -n "${AFDO_VMLINUX:-}" ] && [ -f "$AFDO_VMLINUX" ]; then
   PROFDATA="$HOME/.toolchains/Clang-19.0.0git-20240723/bin/llvm-profdata"
   NM="$HOME/.toolchains/Clang-19.0.0git-20240723/bin/llvm-nm"
   "$PROFDATA" show -sample "$AFDO_PROFILE" 2>/dev/null | grep '^Function: ' | awk '{print $2}' | sed 's/:.*//' | sort -u > /tmp/afdo_funcs.txt || true
-  "$NM" --defined-only /home/dev/pgo/vmlinux 2>/dev/null | awk '$2 ~ /^[tT]$/ {print $3}' | sort -u > /tmp/vmlinux_funcs.txt || true
+  "$NM" --defined-only "$AFDO_VMLINUX" 2>/dev/null | awk '$2 ~ /^[tT]$/ {print $3}' | sort -u > /tmp/vmlinux_funcs.txt || true
   MATCH=$(comm -12 /tmp/afdo_funcs.txt /tmp/vmlinux_funcs.txt | wc -l || true)
   TOTAL=$(wc -l < /tmp/afdo_funcs.txt)
   if [ "$TOTAL" -gt 0 ]; then
@@ -173,7 +165,7 @@ if [ -n "$AFDO_PROFILE" ] && [ -f /home/dev/pgo/vmlinux ]; then
     fi
   fi
 elif [ -n "$AFDO_PROFILE" ]; then
-  warn "AutoFDO 新鲜度防线未启用（/home/dev/pgo/vmlinux 缺失）"
+  warn "AutoFDO 新鲜度防线未启用（AFDO_VMLINUX 未配置或文件不存在）"
 fi
 # 编译器参数官方工具链支持验证
 info "编译器参数支持验证（ZyCromerZ clang 19 官方工具链）:"
@@ -249,7 +241,7 @@ if [ -n "$AFDO_PROFILE" ]; then
   AFDO_CFLAGS="-fprofile-sample-accurate -mllvm -sample-profile-max-propagate-iterations=300"
   AFDO_MAKE_ARGS="CLANG_AUTOFDO_PROFILE=$AFDO_PROFILE"
 fi
-make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" LD="$(pwd)/ld-wrapper" HOSTLD=ld.lld O=out KCFLAGS="-O3 -Wno-error $KCFLAGS_EXTRA $AFDO_CFLAGS" $AFDO_MAKE_ARGS Image
+make -j${BUILD_JOBS} LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" LD="$(pwd)/ld-wrapper" HOSTLD=ld.lld O=out KCFLAGS="-O3 -Wno-error $KCFLAGS_EXTRA $AFDO_CFLAGS" $AFDO_MAKE_ARGS Image
 assert_ikcfg() {
   grep -q "^${1}=y" <<< "$IKCFG_TEXT" || die "Image 内嵌配置缺少 ${1}，产物配置陈旧，中止"
 }
