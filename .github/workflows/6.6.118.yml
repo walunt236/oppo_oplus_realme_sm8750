@@ -188,6 +188,7 @@ jobs:
       - name: 编译内核
         if: ${{ !inputs.diagnosis }}
         run: |
+          set -o pipefail
           : > "$HOME/kbuild.log"
           bash "$GITHUB_WORKSPACE/scripts/build_kernel.sh" 2>&1 | tee -a "$HOME/kbuild.log"
 
