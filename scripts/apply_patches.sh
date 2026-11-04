@@ -5,6 +5,14 @@ source "$(dirname "$0")/common.sh"
 cd "$GITHUB_WORKSPACE/kernel_workspace"
 : > /tmp/sync_failed.list
 
+# 复位内核源码：丢弃上次遗留的补丁改动，保证每次从 OEM 原始状态重新打补丁
+# （否则 KernelSU 等上游更新后，旧补丁残留会导致 undefined symbol 链接失败）
+if [ -d common/.git ]; then
+  git -C common checkout -- . 2>/dev/null || true
+  git -C common clean -fdq 2>/dev/null || true
+  info "内核源码已复位到 OEM 原始状态"
+fi
+
 REJ_DIR="${OUT_DIR:-$HOME/share/out}/rej"
 mkdir -p "$REJ_DIR"
 
