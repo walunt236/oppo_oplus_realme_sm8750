@@ -109,7 +109,6 @@ jobs:
       contents: write
     env:
       LOG_FILE: ${{ github.workspace }}/build_summary.log
-      RUNNER_TYPE: ${{ inputs.runner_type }}
       KSU_TYPE: ${{ inputs.ksu_type }}
       SUSFS_ENABLE: ${{ inputs.susfs_enable }}
       KPM_ENABLE: ${{ inputs.kpm_enable }}
@@ -146,17 +145,6 @@ jobs:
 
       - name: ccache 配置
         run: bash "$GITHUB_WORKSPACE/scripts/ccache_setup.sh"
-
-      - name: 载入 ccache 缓存
-        if: inputs.runner_type == 'ubuntu-latest'
-        uses: actions/cache@v5
-        id: ccache-restore
-        with:
-          path: ${{ env.CCACHE_DIR }}
-          key: ${{ env.CCACHE_REAL_KEY }}-${{ runner.os }}-${{ github.ref_name }}
-          restore-keys: |
-            ${{ env.CCACHE_REAL_KEY }}-${{ runner.os }}-
-            ${{ env.CCACHE_REAL_KEY }}-
 
       - name: 清除旧 ccache 缓存
         if: inputs.ccache_update
@@ -222,13 +210,6 @@ jobs:
           fi
           echo "=================================================="
 
-      - name: 保存新的 ccache 缓存
-        if: ${{ inputs.runner_type == 'ubuntu-latest' && (inputs.ccache_update || steps.ccache-restore.outputs.cache-hit != 'true') && !inputs.diagnosis }}
-        uses: actions/cache/save@v5
-        with:
-          path: ${{ env.CCACHE_DIR }}
-          key: ${{ env.CCACHE_REAL_KEY }}-${{ runner.os }}-${{ github.ref_name }}
-
       - name: 打包发布
         if: ${{ !inputs.diagnosis }}
         id: create_zip
@@ -240,32 +221,3 @@ jobs:
         with:
           name: ccache-debug-log
           path: ${{ github.workspace }}/kernel_workspace/ccache.log
-
-      - name: 上传 ZIP (仅云端)
-        if: ${{ !inputs.diagnosis && inputs.runner_type == 'ubuntu-latest' }}
-        uses: actions/upload-artifact@v7
-        with:
-          name: ak3-release
-          path: ${{ github.workspace }}/kernel_workspace/AnyKernel*.zip
-          if-no-files-found: error
-
-      - name: 发布 Release (仅云端)
-        if: ${{ !inputs.diagnosis && inputs.runner_type == 'ubuntu-latest' }}
-        run: |
-          cd "$GITHUB_WORKSPACE/kernel_workspace"
-
-          TIME_TAG="$(TZ='Asia/Shanghai' date +'%Y%m%d-%H%M')"
-          RELEASE_TAG="v${{ env.KERNEL_VERSION }}.${{ env.SUB_VERSION }}-${TIME_TAG}"
-          RELEASE_TITLE="OnePlus13 内核 v${{ env.KERNEL_VERSION }}.${{ env.SUB_VERSION }} [${{ inputs.ksu_type }}]"
-
-          BUILD_TIME="$(TZ='Asia/Shanghai' date +'%Y-%m-%d %H:%M:%S')"
-          RELEASE_NOTES=" **一加13 内核编译完成**
-          - **构建时间**: ${BUILD_TIME}
-          - **KernelSU**: ${{ inputs.ksu_type }} (${{ env.KSUVER }})
-          - **SUSFS**: ${{ inputs.susfs_enable }}
-          - **KPM**: ${{ inputs.kpm_enable }}"
-
-          gh release create "$RELEASE_TAG" \
-            --title "$RELEASE_TITLE" \
-            --notes "$RELEASE_NOTES" \
-            AnyKernel3*.zip
