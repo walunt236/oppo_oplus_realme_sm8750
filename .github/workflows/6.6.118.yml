@@ -196,7 +196,9 @@ jobs:
 
       - name: 编译内核
         if: ${{ !inputs.diagnosis }}
-        run: bash "$GITHUB_WORKSPACE/scripts/build_kernel.sh"
+        run: |
+          : > "$HOME/kbuild.log"
+          bash "$GITHUB_WORKSPACE/scripts/build_kernel.sh" 2>&1 | tee -a "$HOME/kbuild.log"
 
       - name: 上传诊断配置文本
         if: inputs.diagnosis
