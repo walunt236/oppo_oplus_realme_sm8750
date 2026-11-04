@@ -144,6 +144,12 @@ KCFLAGS_EXTRA+=" -mllvm -enable-loopinterchange=true -mllvm -enable-ipra -mllvm 
 KCFLAGS_EXTRA+=" -mllvm -enable-aarch64-lsr-cost-opt -mllvm -enable-aarch64-or-like-select -mllvm -vectorizer-min-trip-count=2"
 KCFLAGS_EXTRA+=" -mllvm -unroll-threshold=300 -mllvm -enable-loop-distribute"
 
+# KernelSU 当前 Kbuild 未编译 preinit/，但 SUSFS 补丁的 exec.c 钩子引用其符号；
+# 用 SUSFS 官方开关 KSU_NO_PREINIT 关掉这组钩子，避免链接期 undefined symbol。
+if [[ "${SUSFS_ENABLE:-false}" == "true" && "${KSU_TYPE:-none}" != "none" ]]; then
+  KCFLAGS_EXTRA+=" -DKSU_NO_PREINIT"
+fi
+
 info "核心编译器版本检查："
 clang --version | head -n 1
 info "链接器版本检查："
