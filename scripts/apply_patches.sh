@@ -9,20 +9,21 @@ REJ_DIR="${OUT_DIR:-$HOME/share/out}/rej"
 mkdir -p "$REJ_DIR"
 
 count_rejs() {
-  local label="$1" files hunks
+  local label="$1" files hunks safe
+  safe="${label//$/_}"
   files=$(find . -name "*.rej" 2>/dev/null | wc -l)
   hunks=$(find . -name "*.rej" -exec awk '/^@@/{n++} END{print n+0}' {} \; 2>/dev/null | awk '{s+=$1} END{print s+0}')
   if [ "$files" -gt 0 ]; then
     find . -name "*.rej" 2>/dev/null | while IFS= read -r f; do
       rel=$(printf '%s' "$f" | sed 's|^\./||')
-      cp -f "$f" "$REJ_DIR/$label-$(printf '%s' "$rel" | tr '/' '_')" 2>/dev/null || true
-      printf '%s  失败hunk=%s\n' "$rel" "$(awk '/^@@/{n++} END{print n+0}' "$f")" >> "$REJ_DIR/$label.summary"
+      cp -f "$f" "$REJ_DIR/$safe-$(printf '%s' "$rel" | tr '/' '_')" 2>/dev/null || true
+      printf '%s  失败hunk=%s\n' "$rel" "$(awk '/^@@/{n++} END{print n+0}' "$f")" >> "$REJ_DIR/$safe.summary"
     done
     find . -name "*.rej" -delete 2>/dev/null || true
   fi
   TOTAL_REJ=$((TOTAL_REJ + hunks))
   TOTAL_REJ_FILES=$((TOTAL_REJ_FILES + files))
-  info "$label reject: ${files} 文件 / ${hunks} hunk（明细 $REJ_DIR/$label.summary）"
+  info "$label reject: ${files} 文件 / ${hunks} hunk（明细 $REJ_DIR/$safe.summary）"
 }
 
 link_ksu_kernel() {
@@ -335,7 +336,10 @@ for hash in e8400a0 a09e19e; do
 done
 count_rejs "Palazik"
 
-UNICODE_PATCH=$(find_latest "$WILD_DIR/" "*unicode*.patch")
+UNICODE_PATCH=$(find_latest "$WILD_DIR/" "*unicode*6.1+*.patch")
+if [ -z "$UNICODE_PATCH" ]; then
+  UNICODE_PATCH=$(find_latest "$WILD_DIR/" "*unicode*.patch")
+fi
 if [ -n "$UNICODE_PATCH" ]; then
   info "匹配到 Unicode 防检测路径补丁: $UNICODE_PATCH"
   sed -i 's/\r$//' "$UNICODE_PATCH"
