@@ -54,7 +54,10 @@ OEM_BRANCH="oneplus/sm8750_b_16.0.0_oneplus_13"
 
 mkdir -p "$HOME/.cache_patches"
 info "后台预查询 AOSP 最新标签..."
-( gproxy ls-remote --tags --sort=-v:refname https://android.googlesource.com/kernel/common 'refs/tags/android15-6.6.*_r00' | head -1 | awk '{print $2}' | sed 's|refs/tags/||' > "$HOME/.cache_patches/latest_aosp_tag" ) &
+( for u in https://android.googlesource.com/kernel/common https://github.com/aosp-mirror/kernel_common; do
+    out=$(git -c http.proxy= ls-remote --tags --sort=-v:refname "$u" 'refs/tags/android15-6.6.*_r00' 2>/dev/null | head -1 | awk '{print $2}' | sed 's|refs/tags/||')
+    if [ -n "$out" ]; then echo "$out"; break; fi
+  done > "$HOME/.cache_patches/latest_aosp_tag" ) &
 AOSP_TAG_PID=$!
 
 if [ -d "common/.git" ]; then
@@ -107,13 +110,17 @@ LATEST_AOSP_TAG=${LATEST_AOSP_TAG:-android15-6.6}
 grep -qE '^android15-6\.6(\.[0-9]+_r[0-9]+)?$' <<< "$LATEST_AOSP_TAG" || { warn "AOSP 标签格式异常: $LATEST_AOSP_TAG，回退 android15-6.6"; LATEST_AOSP_TAG=android15-6.6; }
 info "AOSP 最新发布标签: $LATEST_AOSP_TAG"
 FETCH_OK=0
-for i in 1 2 3; do
-  if gproxy fetch --depth=1 --no-tags https://android.googlesource.com/kernel/common "$LATEST_AOSP_TAG"; then
-    FETCH_OK=1
-    break
-  fi
-  warn "AOSP fetch 失败(第${i}次)，5 秒后重试..."
-  sleep 5
+for url in https://android.googlesource.com/kernel/common https://github.com/aosp-mirror/kernel_common; do
+  for i in 1 2; do
+    if git -c http.proxy= fetch --depth=1 --no-tags "$url" "$LATEST_AOSP_TAG"; then
+      FETCH_OK=1
+      info "AOSP 源码来自: $url"
+      break
+    fi
+    warn "AOSP fetch 失败(第${i}次, $url)，5 秒后重试..."
+    sleep 5
+  done
+  if [ "$FETCH_OK" -eq 1 ]; then break; fi
 done
 if [[ "$FETCH_OK" -eq 1 ]]; then
   UPSTREAM_SUBLEVEL=$(git show FETCH_HEAD:Makefile | sed -n 's/^SUBLEVEL\s*=\s*\([0-9]*\).*/\1/p')
