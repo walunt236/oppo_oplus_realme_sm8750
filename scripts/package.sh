@@ -127,8 +127,8 @@ echo "ak3name=$AK3_NAME" >> "$GITHUB_OUTPUT"
 
 if [[ "$RUNNER_TYPE" == "self-hosted" ]]; then
   # 输出目录优先级：显式指定 > WSL 的 /mnt/d > 用户家目录
-  if [ -n "${AK3_OUT_DIR:-}" ]; then
-    TARGET_DIR="$AK3_OUT_DIR"
+  if [ -n "${OUT_DIR:-}" ]; then
+    TARGET_DIR="$OUT_DIR"
   elif [ -d /mnt/d ]; then
     TARGET_DIR="/mnt/d/AK3_DOC"
   else
