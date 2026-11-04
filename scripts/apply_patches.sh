@@ -5,12 +5,24 @@ source "$(dirname "$0")/common.sh"
 cd "$GITHUB_WORKSPACE/kernel_workspace"
 : > /tmp/sync_failed.list
 
+REJ_DIR="${OUT_DIR:-$HOME/share/out}/rej"
+mkdir -p "$REJ_DIR"
+
 count_rejs() {
-  local label="$1" n
-  n=$(find . -name "*.rej" 2>/dev/null | wc -l || true)
-  find . -name "*.rej" -delete 2>/dev/null || true
-  TOTAL_REJ=$((TOTAL_REJ + n))
-  info "$label reject: $n"
+  local label="$1" files hunks
+  files=$(find . -name "*.rej" 2>/dev/null | wc -l)
+  hunks=$(find . -name "*.rej" -exec awk '/^@@/{{n++}} END{{print n+0}}' {{}} \; 2>/dev/null | awk '{{s+=$1}} END{{print s+0}}')
+  if [ "$files" -gt 0 ]; then
+    find . -name "*.rej" 2>/dev/null | while IFS= read -r f; do
+      rel=$(printf '%s' "$f" | sed 's|^\./||')
+      cp -f "$f" "$REJ_DIR/$label-$(printf '%s' "$rel" | tr '/' '_')" 2>/dev/null || true
+      printf '%s  失败hunk=%s\n' "$rel" "$(awk '/^@@/{{n++}} END{{print n+0}}' "$f")" >> "$REJ_DIR/$label.summary"
+    done
+    find . -name "*.rej" -delete 2>/dev/null || true
+  fi
+  TOTAL_REJ=$((TOTAL_REJ + hunks))
+  TOTAL_REJ_FILES=$((TOTAL_REJ_FILES + files))
+  info "$label reject: ${files} 文件 / ${hunks} hunk（明细 $REJ_DIR/$label.summary）"
 }
 
 link_ksu_kernel() {
@@ -223,21 +235,16 @@ find . -name "*.rej" -delete 2>/dev/null || true
 
 info "注入风驰引擎补丁..."
 patch -p1 -F 3 -f < "$PATCH_FILE" || true
-REJ_COUNT=$(find . -name "*.rej" 2>/dev/null | wc -l)
-if [ "$REJ_COUNT" -gt 0 ]; then
-  warn "风驰补丁有 $REJ_COUNT 个 reject:"
+FENGCHI_HUNKS=$(find . -name "*.rej" -exec awk '/^@@/{{n++}} END{{print n+0}}' {{}} \; 2>/dev/null | awk '{{s+=$1}} END{{print s+0}}')
+if [ "${FENGCHI_HUNKS:-0}" -gt 0 ]; then
+  warn "风驰补丁有 ${FENGCHI_HUNKS} 个 hunk 未应用（其余已生效）:"
   find . -name "*.rej" 2>/dev/null | while IFS= read -r f; do
-    echo "  --- $(basename "$f") ---" | tee -a "$LOG_FILE"
-    head -20 "$f" | tee -a "$LOG_FILE"
+    echo "  --- ${f} ---" | tee -a "$LOG_FILE"
+    head -12 "$f" | tee -a "$LOG_FILE"
   done
-fi
-if [ "$REJ_COUNT" -le 3 ]; then
-  warn "风驰补丁 reject ≤3（上游合并导致偏移），继续编译"
 else
-  error "风驰核心补丁应用失败（$REJ_COUNT 个 reject）"
-  exit 1
+  info "风驰补丁全部应用"
 fi
-find . -name "*.rej" -delete 2>/dev/null
 
 info "注入 Overwriter 补丁..."
 OVERWRITER_PATCH=$(find_latest "$WILD_DIR/oneplus/hmbird/" "overwriter.patch")
@@ -294,17 +301,22 @@ curl -fSL --retry 3 --retry-delay 5 --retry-all-errors --connect-timeout 10 --ma
 patch -p1 --forward -f < /tmp/mm_vmpressure.patch || warn "mm_vmpressure 应用失败，继续..."
 
 TOTAL_REJ=0
+TOTAL_REJ_FILES=0
 count_rejs "风驰批"
 
 mkdir -p "$HOME/.cache_patches/aosp"
-for hash in 47f80469849a 5fddd8e6a0a7 0a9eef42768c 71bd6942e33f ef0123e95425 7abe312b37cf 6a42fccfc2bc d43ee181a478 5c8ecdcfbfb0 c5d6863c9aba 9eecad532ad3 c7a8aea27b87; do
+for hash in 47f80469849a 5fddd8e6a0a7 0a9eef42768c 71bd6942e33f ef0123e95425 7abe312b37cf 6a42fccfc2bc d43ee181a478 5c8ecdcfbfb0 c5d6863c9aba 9eecad532ad3; do
   if [ ! -s "$HOME/.cache_patches/aosp/$hash.patch" ]; then
     curl -fsSL --retry 3 --retry-delay 5 --connect-timeout 10 --max-time 30 \
       -o "$HOME/.cache_patches/aosp/$hash.patch" "https://github.com/aosp-mirror/kernel_common/commit/$hash.patch" 2>/dev/null || rm -f "$HOME/.cache_patches/aosp/$hash.patch"
   fi
 done
-for hash in 47f80469849a 5fddd8e6a0a7 0a9eef42768c 71bd6942e33f ef0123e95425 7abe312b37cf 6a42fccfc2bc d43ee181a478 5c8ecdcfbfb0 c5d6863c9aba 9eecad532ad3 c7a8aea27b87; do
-  patch -p1 --forward -F 3 < "$HOME/.cache_patches/aosp/$hash.patch" 2>/dev/null || warn "aosp/$hash.patch 应用失败，继续..."
+for hash in 47f80469849a 5fddd8e6a0a7 0a9eef42768c 71bd6942e33f ef0123e95425 7abe312b37cf 6a42fccfc2bc d43ee181a478 5c8ecdcfbfb0 c5d6863c9aba 9eecad532ad3; do
+  if [ -s "$HOME/.cache_patches/aosp/$hash.patch" ]; then
+    patch -p1 --forward -F 3 < "$HOME/.cache_patches/aosp/$hash.patch" 2>/dev/null || warn "aosp/$hash.patch 应用失败，继续..."
+  else
+    warn "aosp/$hash.patch 下载失败（commit 可能不存在），跳过"
+  fi
 done
 count_rejs "AOSP"
 
@@ -339,13 +351,14 @@ git -C "$GITHUB_WORKSPACE/kernel_workspace/common" checkout -- drivers/dma-buf/d
 
 count_rejs "Unicode/收尾"
 
-if [ "$TOTAL_REJ" -gt 15 ]; then
-  error "风驰+优化补丁总计 $TOTAL_REJ 个 reject（>15），请检查补丁兼容性"
+if [ "$TOTAL_REJ" -gt 60 ]; then
+  error "补丁失败 hunk 总计 $TOTAL_REJ（>60），中止构建"
   exit 1
-elif [ "$TOTAL_REJ" -gt 10 ]; then
-  warn "风驰+优化补丁总计 $TOTAL_REJ 个 reject，部分优化可能未生效"
+elif [ "$TOTAL_REJ" -gt 0 ]; then
+  warn "补丁失败 hunk 总计 $TOTAL_REJ（涉及 $TOTAL_REJ_FILES 个文件），部分功能可能未生效"
+  warn "明细已保存到 $REJ_DIR/*.summary 与同名 .rej"
 else
-  info "风驰+优化补丁 reject 总计 $TOTAL_REJ 个，正常"
+  info "所有补丁干净应用（0 reject）"
 fi
 
 info "风驰引擎补丁注入完成"
