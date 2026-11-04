@@ -1,6 +1,9 @@
 #!/bin/bash
 set -euo pipefail
 
+# 参数集中定义（唯一来源）；用 BASH_SOURCE 保证被 source 时路径正确
+. "$(dirname "${BASH_SOURCE[0]}")/build.env"
+
 LOG_FILE="${LOG_FILE:-$GITHUB_WORKSPACE/build_summary.log}"
 
 info() { echo "[INFO] $*" | tee -a "$LOG_FILE"; }
@@ -14,12 +17,23 @@ glr() {
     printf '%s\n' "$out" >&2
     return 0
   fi
-  warn "glr 直连通道失败: $(printf '%s\n' "$out" | grep -iE 'fatal|error|timed out|Could not' | tail -1)"
-  git -c http.proxy=http://127.0.0.1:7897 -c https.proxy=http://127.0.0.1:7897 -c http.version=HTTP/1.1 -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=60 "$@"
+  if [ -n "${PROXY_URL:-}" ]; then
+    warn "glr 直连失败，改用代理 $PROXY_URL 重试"
+    git -c http.proxy="$PROXY_URL" -c https.proxy="$PROXY_URL" -c http.version=HTTP/1.1 \
+        -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=60 "$@"
+  else
+    warn "glr 直连失败（未配置 PROXY_URL，不再重试）: $(printf '%s\n' "$out" | grep -iE 'fatal|error|timed out|Could not' | tail -1)"
+    return 1
+  fi
 }
 
 gproxy() {
-  git -c http.proxy=http://127.0.0.1:7897 -c https.proxy=http://127.0.0.1:7897 -c http.version=HTTP/1.1 -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=60 "$@"
+  if [ -n "${PROXY_URL:-}" ]; then
+    git -c http.proxy="$PROXY_URL" -c https.proxy="$PROXY_URL" -c http.version=HTTP/1.1 \
+        -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=60 "$@"
+  else
+    git "$@"
+  fi
 }
 
 PENDING_SYNC="$HOME/.cache_patches/pending_sync"
@@ -38,17 +52,6 @@ sync_repo() {
   else
     rm -rf "$dir"
     glr clone --depth=1 "$url" "$dir" -b "$branch" || { error "补丁仓克隆失败: $url ($branch)"; exit 1; }
-  fi
-}
-
-detect_proxy() {
-  if curl -s -o /dev/null --connect-timeout 2 --max-time 3 --proxy http://127.0.0.1:7897 https://api.github.com 2>/dev/null; then
-    echo "http_proxy=http://127.0.0.1:7897" >> "$GITHUB_ENV"
-    echo "https_proxy=http://127.0.0.1:7897" >> "$GITHUB_ENV"
-    export http_proxy=http://127.0.0.1:7897 https_proxy=http://127.0.0.1:7897
-    info "检测到本地代理 127.0.0.1:7897，网络操作走代理"
-  else
-    info "未检测到代理，纯直连模式（api/codeload/SSH443 直连可用，AOSP 走 gproxy 代理）"
   fi
 }
 
