@@ -11,12 +11,12 @@ mkdir -p "$REJ_DIR"
 count_rejs() {
   local label="$1" files hunks
   files=$(find . -name "*.rej" 2>/dev/null | wc -l)
-  hunks=$(find . -name "*.rej" -exec awk '/^@@/{{n++}} END{{print n+0}}' {{}} \; 2>/dev/null | awk '{{s+=$1}} END{{print s+0}}')
+  hunks=$(find . -name "*.rej" -exec awk '/^@@/{n++} END{print n+0}' {} \; 2>/dev/null | awk '{s+=$1} END{print s+0}')
   if [ "$files" -gt 0 ]; then
     find . -name "*.rej" 2>/dev/null | while IFS= read -r f; do
       rel=$(printf '%s' "$f" | sed 's|^\./||')
       cp -f "$f" "$REJ_DIR/$label-$(printf '%s' "$rel" | tr '/' '_')" 2>/dev/null || true
-      printf '%s  失败hunk=%s\n' "$rel" "$(awk '/^@@/{{n++}} END{{print n+0}}' "$f")" >> "$REJ_DIR/$label.summary"
+      printf '%s  失败hunk=%s\n' "$rel" "$(awk '/^@@/{n++} END{print n+0}' "$f")" >> "$REJ_DIR/$label.summary"
     done
     find . -name "*.rej" -delete 2>/dev/null || true
   fi
@@ -235,7 +235,7 @@ find . -name "*.rej" -delete 2>/dev/null || true
 
 info "注入风驰引擎补丁..."
 patch -p1 -F 3 -f < "$PATCH_FILE" || true
-FENGCHI_HUNKS=$(find . -name "*.rej" -exec awk '/^@@/{{n++}} END{{print n+0}}' {{}} \; 2>/dev/null | awk '{{s+=$1}} END{{print s+0}}')
+FENGCHI_HUNKS=$(find . -name "*.rej" -exec awk '/^@@/{n++} END{print n+0}' {} \; 2>/dev/null | awk '{s+=$1} END{print s+0}')
 if [ "${FENGCHI_HUNKS:-0}" -gt 0 ]; then
   warn "风驰补丁有 ${FENGCHI_HUNKS} 个 hunk 未应用（其余已生效）:"
   find . -name "*.rej" 2>/dev/null | while IFS= read -r f; do
