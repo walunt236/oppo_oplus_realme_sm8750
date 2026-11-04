@@ -55,7 +55,11 @@ fi
 echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" >> "$DCFG"
 sed -i 's/check_defconfig//' ./common/build.config.gki || true
 echo "CONFIG_HEADERS_INSTALL=n" >> "$DCFG"
-echo "CONFIG_AUTOFDO_CLANG=y" >> "$DCFG"
+if [ -s "$HOME/.cache_patches/afdo/kernel.afdo" ]; then
+  echo "CONFIG_AUTOFDO_CLANG=y" >> "$DCFG"
+else
+  info "未找到 AutoFDO profile，跳过 CONFIG_AUTOFDO_CLANG"
+fi
 echo "CONFIG_SECTION_MISMATCH_WARN_ONLY=y" >> "$DCFG"
 
 echo 'CONFIG_ZRAM=y' >> "$DCFG"
