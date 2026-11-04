@@ -125,8 +125,8 @@ rm -f ../AnyKernel3-*.zip
 zip -r "../$AK3_NAME" ./*
 echo "ak3name=$AK3_NAME" >> "$GITHUB_OUTPUT"
 
-# 产物输出目录：build.env 的 OUT_DIR（默认 $HOME/ak3-out）
-TARGET_DIR="${OUT_DIR:-$HOME/ak3-out}"
+# 产物输出目录：build.env 的 OUT_DIR（默认 $HOME/share/out）
+TARGET_DIR="${OUT_DIR:-$HOME/share/out}"
 if mkdir -p "$TARGET_DIR" 2>/dev/null; then
   if [ -f "$TARGET_DIR/$AK3_NAME" ]; then
     mv -f "$TARGET_DIR/$AK3_NAME" "$TARGET_DIR/$AK3_NAME.prev"
