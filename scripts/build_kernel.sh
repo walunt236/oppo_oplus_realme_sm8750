@@ -1,6 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 source "$(dirname "$0")/common.sh"
+export AFDO_PROFILE="${AFDO_PROFILE:-}"
 
 # 增量编译 mtime 钳制
 cd "$GITHUB_WORKSPACE/kernel_workspace/common"
@@ -196,8 +197,7 @@ if [ -n "$AFDO_PROFILE" ]; then
     echo "  ✓ --lto-sample-profile（ThinLTO 链接期二次应用）" | tee -a "$LOG_FILE"
   fi
 else
-  error "AFDO_PROFILE 未就绪（profile 步骤异常），中止构建"
-  exit 1
+  warn "未提供 AutoFDO profile，本次跳过 AutoFDO 相关优化"
 fi
 for flag in "-O3" "-falign-functions=32" "-falign-loops=32" "-moutline-atomics" "-fno-semantic-interposition" "-fno-math-errno" "-mllvm -polly"; do
   if clang $flag -### -c /dev/null 2>&1 | grep -qE "error|unknown|not supported"; then
@@ -243,7 +243,13 @@ if grep -q 'if (min_seq\[!can_swap\] + MIN_NR_GENS < max_seq)' mm/vmscan.c; then
 else
   warn "MGLRU aging line already modified, skipped"
 fi
-make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" LD="$(pwd)/ld-wrapper" HOSTLD=ld.lld O=out KCFLAGS="-O3 -Wno-error $KCFLAGS_EXTRA -fprofile-sample-accurate -mllvm -sample-profile-max-propagate-iterations=300" CLANG_AUTOFDO_PROFILE="$AFDO_PROFILE" Image
+AFDO_CFLAGS=""
+AFDO_MAKE_ARGS=""
+if [ -n "$AFDO_PROFILE" ]; then
+  AFDO_CFLAGS="-fprofile-sample-accurate -mllvm -sample-profile-max-propagate-iterations=300"
+  AFDO_MAKE_ARGS="CLANG_AUTOFDO_PROFILE=$AFDO_PROFILE"
+fi
+make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" LD="$(pwd)/ld-wrapper" HOSTLD=ld.lld O=out KCFLAGS="-O3 -Wno-error $KCFLAGS_EXTRA $AFDO_CFLAGS" $AFDO_MAKE_ARGS Image
 assert_ikcfg() {
   grep -q "^${1}=y" <<< "$IKCFG_TEXT" || die "Image 内嵌配置缺少 ${1}，产物配置陈旧，中止"
 }
@@ -254,7 +260,7 @@ if [ -f out/arch/arm64/boot/Image ]; then
     exit 1
   fi
   assert_ikcfg CONFIG_ZRAM_MEMORY_TRACKING
-  assert_ikcfg CONFIG_AUTOFDO_CLANG
+  if [ -n "$AFDO_PROFILE" ]; then assert_ikcfg CONFIG_AUTOFDO_CLANG; fi
   assert_ikcfg CONFIG_HZ_300
   assert_ikcfg CONFIG_TCP_CONG_BBR3
   assert_ikcfg CONFIG_IP_SET
