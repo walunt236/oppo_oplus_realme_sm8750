@@ -11,7 +11,7 @@ fi
 echo "CCACHE_REAL_KEY=$CCACHE_REAL_KEY" >> "$GITHUB_ENV"
 
 echo "CCACHE_DIR=$HOME/.ccache" >> "$GITHUB_ENV"
-echo "CCACHE_MAXSIZE=40G" >> "$GITHUB_ENV"
+echo "CCACHE_MAXSIZE=$CCACHE_SIZE" >> "$GITHUB_ENV"
 echo "CCACHE_BASEDIR=$GITHUB_WORKSPACE" >> "$GITHUB_ENV"
 echo "CCACHE_COMPILERCHECK=content" >> "$GITHUB_ENV"
 echo "CCACHE_NOHASHDIR=true" >> "$GITHUB_ENV"
@@ -32,7 +32,7 @@ if ccache --help 2>&1 | grep -q 'depend_mode'; then
 fi
 
 mkdir -p "$HOME/.ccache"
-ccache -M "40G"
+ccache -M "$CCACHE_SIZE"
 ccache -o compression=true
 if ! grep -q '^sloppiness' "$HOME/.ccache/ccache.conf" 2>/dev/null; then
   echo "sloppiness = file_macro,time_macros,include_file_mtime,include_file_ctime,pch_defines,system_headers,locale" >> "$HOME/.ccache/ccache.conf"
