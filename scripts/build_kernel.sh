@@ -72,7 +72,7 @@ if [ -f out/.config ]; then
   fi
 fi
 
-assert_config CONFIG_AUTOFDO_CLANG "AutoFDO (AUTOFDO_CLANG)"
+if [ -n "$AFDO_PROFILE" ]; then assert_config CONFIG_AUTOFDO_CLANG "AutoFDO (AUTOFDO_CLANG)"; fi
 assert_config CONFIG_SECTION_MISMATCH_WARN_ONLY "SECTION_MISMATCH_WARN_ONLY (modpost mismatch 降级警告)"
 assert_config CONFIG_LTO_CLANG_THIN "ThinLTO"
 assert_config CONFIG_HZ_300 "HZ=300"
