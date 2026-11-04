@@ -132,8 +132,11 @@ jobs:
           git init -q 2>/dev/null || true
           git remote remove origin 2>/dev/null || true
           git remote add origin "https://github.com/$GITHUB_REPOSITORY.git"
-          git -c http.version=HTTP/1.1 fetch origin "$GITHUB_REF_NAME" --depth=1 2>/dev/null || \
-            git -c http.proxy=http://127.0.0.1:7897 -c https.proxy=http://127.0.0.1:7897 fetch origin "$GITHUB_REF_NAME" --depth=1
+          for i in 1 2 3; do
+            git -c http.version=HTTP/1.1 fetch origin "$GITHUB_REF_NAME" --depth=1 2>/dev/null && break
+            echo "[WARN] 仓库拉取第 $i 次失败，5 秒后重试"
+            sleep 5
+          done
           git reset --hard FETCH_HEAD
           git clean -fdq -e kernel_workspace
 
