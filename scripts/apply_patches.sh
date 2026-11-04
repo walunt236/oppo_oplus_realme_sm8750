@@ -226,7 +226,7 @@ patch -p1 -F 3 -f < "$PATCH_FILE" || true
 REJ_COUNT=$(find . -name "*.rej" 2>/dev/null | wc -l)
 if [ "$REJ_COUNT" -gt 0 ]; then
   warn "风驰补丁有 $REJ_COUNT 个 reject:"
-  find . -name "*.rej" 2>/dev/null | while read f; do
+  find . -name "*.rej" 2>/dev/null | while IFS= read -r f; do
     echo "  --- $(basename "$f") ---" | tee -a "$LOG_FILE"
     head -20 "$f" | tee -a "$LOG_FILE"
   done
