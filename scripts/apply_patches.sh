@@ -466,6 +466,11 @@ info "调度器优化完成 (16ms PELT / NEXT_BUDDY / HRTICK / SIS_PROP)"
 # 新 glibc（如 26.04 的 2.42）下 strchr() 对 const 参数返回 const char*，
 # 会与内核自带 -Werror 冲突，导致 resolve_btfids 编译失败。
 LIBBPF="$GITHUB_WORKSPACE/kernel_workspace/common/tools/lib/bpf/libbpf.c"
+# 自愈：旧版补丁在 6.6.14x 上会产生 const const
+if grep -qE 'const const char \*next_path;' "$LIBBPF" 2>/dev/null; then
+  sed -i 's/const const char \*next_path;/const char *next_path;/' "$LIBBPF"
+  info "libbpf const 重复声明已修正"
+fi
 if grep -qE '^[[:space:]]*char \*next_path;' "$LIBBPF" 2>/dev/null; then
   sed -i 's/^[[:space:]]*char \*next_path;/const char *next_path;/' "$LIBBPF"
   info "libbpf const 补丁已应用（新 glibc 兼容）"
