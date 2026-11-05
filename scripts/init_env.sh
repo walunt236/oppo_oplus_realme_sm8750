@@ -173,6 +173,13 @@ else
       fi
     done < /tmp/qcom_3way.list
     info "逐文件三方合并: ${QCOM_3WAY_OK} 个成功，${QCOM_3WAY_NG} 个冲突（已采用骁龙版本）"
+
+    # 调度子系统整体对齐上游：三方合并可能产生「新头文件 + 旧实现」的混合体
+    # （例如 init_task.c 保留旧 .scx 字段，而 143 的 sched.h 已移除），统一取上游可消除错配
+    git checkout "refs/qcom/$QCOM_LATEST_TAG" -- \
+      include/linux/sched.h include/linux/sched/ init/init_task.c kernel/sched/ kernel/fork.c \
+      2>/dev/null || true
+    info "调度子系统已统一为骁龙上游版本"
     TARGET_SUBLEVEL=$(git show "refs/qcom/$QCOM_LATEST_TAG:Makefile" 2>/dev/null | sed -n 's/^SUBLEVEL\s*=\s*\([0-9]*\).*/\1/p' || true)
     if [[ -n "$TARGET_SUBLEVEL" ]]; then
       sed -i "s/^SUBLEVEL = .*/SUBLEVEL = $TARGET_SUBLEVEL/" Makefile
