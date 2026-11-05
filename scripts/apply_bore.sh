@@ -20,8 +20,12 @@ grep -q '^CONFIG_SCHED_BORE=y' arch/arm64/configs/gki_defconfig || \
   echo 'CONFIG_SCHED_BORE=y' >> arch/arm64/configs/gki_defconfig
 
 # 关键闸门：BORE 补丁不得破坏 OPPO 厂商模块依赖的 trace hook
-for l in '#include <trace/hooks/sched.h>' '#include <trace/hooks/dt
-ask.h>' 'EXPORT_TRACEPOINT_SYMBOL_GPL(sched_stat_runtime)'; do
+HOOKS=(
+  '#include <trace/hooks/sched.h>'
+  '#include <trace/hooks/dtask.h>'
+  'EXPORT_TRACEPOINT_SYMBOL_GPL(sched_stat_runtime)'
+)
+for l in "${HOOKS[@]}"; do
   grep -qF "$l" kernel/sched/fair.c || die "BORE 补丁误删 OEM 内容: $l"
 done
 
