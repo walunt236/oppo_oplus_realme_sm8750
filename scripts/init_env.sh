@@ -115,7 +115,7 @@ else
   QCOM_SERIES=${QCOM_SERIES:-android15-6.6}
   info "骁龙分支系列: $QCOM_SERIES"
   QCOM_RAW_TAGS=$(git -c http.proxy= ls-remote --tags "$QCOM_REPO" "refs/tags/${QCOM_SERIES}-*_r*" 2>/dev/null) || QCOM_RAW_TAGS=""
-  QCOM_LATEST_TAG=$(printf '%s\n' "$QCOM_RAW_TAGS" | sed 's|refs/tags/||' | grep -oE "${QCOM_SERIES//./\\.}-202[4-9]-[0-9]{2}_r[0-9]+$"' | sort -V | tail -1) || true
+  QCOM_LATEST_TAG=$(printf '%s\n' "$QCOM_RAW_TAGS" | sed 's|refs/tags/||' | grep -oE "${QCOM_SERIES//./\\.}-202[4-9]-[0-9]{2}_r[0-9]+$" | sort -V | tail -1) || true
   QCOM_LATEST_TAG=${QCOM_LATEST_TAG:-$QCOM_BASE_TAG}
   info "骁龙上游: 基线 $QCOM_BASE_TAG -> 目标 $QCOM_LATEST_TAG"
   echo "QCOM_LATEST_TAG=$QCOM_LATEST_TAG" >> "$GITHUB_ENV"
