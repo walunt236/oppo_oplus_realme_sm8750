@@ -45,7 +45,10 @@ else
   info "ccache 已存在: $(ccache --version | head -1)"
 fi
 
-OEM_BRANCH="oneplus/sm8750_b_16.0.0_oneplus_13"
+OEM_URL="https://github.com/OnePlusOSS/android_kernel_common_oneplus_sm8750.git"
+OEM_BRANCH=$(git -c http.proxy= ls-remote --symref "$OEM_URL" HEAD 2>/dev/null | sed -n 's|^ref: refs/heads/\([^\t]*\).*|\1|p' | sed -n '1p') || true
+[ -n "$OEM_BRANCH" ] || die "无法从 $OEM_URL 获取默认分支，中止构建"
+info "一加内核默认分支: $OEM_BRANCH"
 
 mkdir -p "$HOME/.cache_patches"
 
@@ -60,7 +63,7 @@ else
   rm -rf common
   info "首次克隆 OEM 内核源码仓库..."
   retry "OEM 克隆" 3 5 glr clone --depth=1 \
-    https://github.com/OnePlusOSS/android_kernel_common_oneplus_sm8750.git \
+     $OEM_URL \
     -b "$OEM_BRANCH" \
     common || die "OEM 克隆 3 次均失败，中止构建"
 fi
@@ -92,6 +95,17 @@ git config user.name "github-actions[bot]"
 wait $VENDOR_PID || { error "vendor_modules 拉取失败，中止构建"; exit 1; }
 
 # 骁龙(QCOM)上游合并：以 OnePlus BSP 基线 tag 为基点，三方合并到最新骁龙 tag
+# 基线 tag 不写死：从一加提交信息里的 Based on QCOM release TAG 自动解析
+if [[ -z "${QCOM_BASE_TAG:-}" ]]; then
+  QCOM_BASE_TAG=$(
+    git log -1 --format=%B 2>/dev/null | grep -oE 'android15-6\.6-[0-9]{4}-[0-9]{2}_r[0-9]+' | sed -n '1p'
+  ) || QCOM_BASE_TAG=""
+  [[ -n "$QCOM_BASE_TAG" ]] && info "从一加提交信息解析出基线 tag: $QCOM_BASE_TAG"
+fi
+if [[ -z "${QCOM_BASE_TAG:-}" ]]; then
+  warn "无法确定骁龙基线 tag，跳过骁龙上游合并"
+  QCOM_MERGE=false
+fi
 UPSTREAM_SUBLEVEL=""
 if [[ "${QCOM_MERGE:-true}" != "true" ]]; then
   info "QCOM_MERGE=false，跳过骁龙上游合并"
