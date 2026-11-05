@@ -54,13 +54,10 @@ fi
 echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" >> "$DCFG"
 # 骁龙 6.6.14x 已从 kernel/sched/Makefile 移除 ext.o，开启该选项会导致
 # bpf_sched_ext_ops 未定义，这里强制关闭
-# 恢复标准 sched_ext：高通 BSP 把 ext.o 从 Makefile 摘掉了，这里补回并开启
-if [ -f ./common/kernel/sched/Makefile ]; then
-  grep -q 'CONFIG_SCHED_CLASS_EXT.*ext\.o' ./common/kernel/sched/Makefile || \
-    echo 'obj-$(CONFIG_SCHED_CLASS_EXT) += ext.o' >> ./common/kernel/sched/Makefile
-fi
+# 关闭 sched_ext：6.6 内核无此功能（6.12 才进主线），且高通 BSP 已剥离
+# 核心集成（task_struct 缺 sched_ext_entity），开启只会引用不存在的符号
 sed -i '/^CONFIG_SCHED_CLASS_EXT/d' "$DCFG"
-echo "CONFIG_SCHED_CLASS_EXT=y" >> "$DCFG"
+echo "# CONFIG_SCHED_CLASS_EXT is not set" >> "$DCFG"
 sed -i 's/check_defconfig//' ./common/build.config.gki || true
 echo "CONFIG_HEADERS_INSTALL=n" >> "$DCFG"
 if [ "${AFDO_ENABLE:-false}" = "true" ] && [ -s "$HOME/.cache_patches/afdo/kernel.afdo" ]; then
