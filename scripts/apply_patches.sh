@@ -236,7 +236,7 @@ find . -name "*.rej" -delete 2>/dev/null || true
 
 info "注入风驰引擎补丁..."
 # 先 dry-run：补丁与当前基线严重不符时整块跳过，避免"半应用"导致编译失败
-FENGCHI_DRY=$($(patch -p1 -F 3 -f --dry-run < "$PATCH_FILE" 2>&1) || true)
+FENGCHI_DRY=$(patch -p1 -F 3 -f --dry-run < "$PATCH_FILE" 2>&1) || true
 FENGCHI_BAD=$(printf '%s\n' "$FENGCHI_DRY" | grep -oE '[0-9]+ out of [0-9]+ hunks' | awk '{s+=$1} END{print s+0}' || true)
 if [ "${FENGCHI_BAD:-0}" -gt 20 ]; then
   warn "风驰补丁与当前内核基线不匹配（预计 $FENGCHI_BAD 处失败），整块跳过以保持代码一致"
