@@ -151,6 +151,28 @@ else
       warn "骁龙上游合并: $(grep -c '^Applied patch' /tmp/qcom_apply.log) 个文件应用，$(wc -l < "$QCOM_CONFLICT_DIR/conflicts.txt") 个冲突已采用骁龙版本"
     fi
 
+
+    # git apply 无法处理（does not match index / patch does not apply）的文件：
+    # 逐文件做真正的三方合并（base=基线 tag, ours=本地, theirs=目标 tag），
+    # 避免出现「头文件留在旧版本、实现跑到新版本」的半代际状态。
+    grep -oE "^(error: )?[^:]+(: does not match index|: patch does not apply)" /tmp/qcom_apply.log 2>/dev/null \
+      | sed -E 's/^error: //; s/: (does not match index|patch does not apply)$//' | sort -u > /tmp/qcom_3way.list || true
+    QCOM_3WAY_OK=0; QCOM_3WAY_NG=0
+    while IFS= read -r f; do
+      [ -n "$f" ] && [ -f "$f" ] || continue
+      git show "refs/qcom/$QCOM_BASE_TAG:$f" > /tmp/q_base 2>/dev/null || continue
+      git show "refs/qcom/$QCOM_LATEST_TAG:$f" > /tmp/q_theirs 2>/dev/null || continue
+      cp "$f" /tmp/q_ours 2>/dev/null || continue
+      if git merge-file -p /tmp/q_ours /tmp/q_base /tmp/q_theirs > /tmp/q_merged 2>/dev/null; then
+        cp /tmp/q_merged "$f"
+        QCOM_3WAY_OK=$((QCOM_3WAY_OK + 1))
+      else
+        cp /tmp/q_theirs "$f"
+        echo "$f" >> "$QCOM_CONFLICT_DIR/3way_conflicts.txt"
+        QCOM_3WAY_NG=$((QCOM_3WAY_NG + 1))
+      fi
+    done < /tmp/qcom_3way.list
+    info "逐文件三方合并: ${QCOM_3WAY_OK} 个成功，${QCOM_3WAY_NG} 个冲突（已采用骁龙版本）"
     TARGET_SUBLEVEL=$(git show "refs/qcom/$QCOM_LATEST_TAG:Makefile" 2>/dev/null | sed -n 's/^SUBLEVEL\s*=\s*\([0-9]*\).*/\1/p' || true)
     if [[ -n "$TARGET_SUBLEVEL" ]]; then
       sed -i "s/^SUBLEVEL = .*/SUBLEVEL = $TARGET_SUBLEVEL/" Makefile
