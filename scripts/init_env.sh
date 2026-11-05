@@ -97,8 +97,9 @@ if [[ "${QCOM_MERGE:-true}" != "true" ]]; then
   info "QCOM_MERGE=false，跳过骁龙上游合并"
 else
   info "查询骁龙上游最新标签..."
-  QCOM_LATEST_TAG=$(git -c http.proxy= ls-remote --tags --sort=-v:refname "$QCOM_REPO" 'refs/tags/android15-6.6-*_r*' 2>/dev/null \
-    | grep -v '\^{}' | awk '{{print $2}}' | sed 's|refs/tags/||' | head -1)
+  QCOM_RAW_TAGS=$(git -c http.proxy= ls-remote --tags "$QCOM_REPO" 'refs/tags/android15-6.6-*_r*' 2>/dev/null) || QCOM_RAW_TAGS=""
+  QCOM_LATEST_TAG=$(printf '%s\n' "$QCOM_RAW_TAGS" | grep -v '\^{}' | awk '{print $2}' | sed 's|refs/tags/||' | sort -V | tail -1) || true
+  QCOM_LATEST_TAG=${QCOM_LATEST_TAG:-$QCOM_BASE_TAG}
   QCOM_LATEST_TAG=${QCOM_LATEST_TAG:-$QCOM_BASE_TAG}
   info "骁龙上游: 基线 $QCOM_BASE_TAG -> 目标 $QCOM_LATEST_TAG"
   echo "QCOM_LATEST_TAG=$QCOM_LATEST_TAG" >> "$GITHUB_ENV"
@@ -132,7 +133,7 @@ else
       warn "骁龙上游合并: $(grep -c '^Applied patch' /tmp/qcom_apply.log) 个文件应用，$(wc -l < "$QCOM_CONFLICT_DIR/conflicts.txt") 个冲突已回退本地版本"
     fi
 
-    TARGET_SUBLEVEL=$(git show "refs/qcom/$QCOM_LATEST_TAG:Makefile" 2>/dev/null | sed -n 's/^SUBLEVEL\s*=\s*\([0-9]*\).*/\1/p')
+    TARGET_SUBLEVEL=$(git show "refs/qcom/$QCOM_LATEST_TAG:Makefile" 2>/dev/null | sed -n 's/^SUBLEVEL\s*=\s*\([0-9]*\).*/\1/p') || true)
     if [[ -n "$TARGET_SUBLEVEL" ]]; then
       sed -i "s/^SUBLEVEL = .*/SUBLEVEL = $TARGET_SUBLEVEL/" Makefile
       info "内核版本已同步骁龙上游: 6.6.$TARGET_SUBLEVEL"
