@@ -3,7 +3,8 @@
 set -euo pipefail
 source "$(dirname "$0")/common.sh"
 
-PATCH="$GITHUB_WORKSPACE/patches/bore/bore-6.6.143.patch"
+DIR="$GITHUB_WORKSPACE/patches/bore"
+PATCH="$DIR/bore-6.6.143.patch"
 [ -f "$PATCH" ] || die "BORE 补丁不存在: $PATCH"
 
 cd "$GITHUB_WORKSPACE/kernel_workspace/common"
@@ -16,6 +17,10 @@ else
   patch -p1 -F 3 --forward < "$PATCH" || die "BORE 补丁应用失败"
 fi
 
+# 新增文件直接落盘（不放进补丁，避免版本漂移）
+cp -f "$DIR/files/bore.c" kernel/sched/bore.c
+cp -f "$DIR/files/bore.h" include/linux/sched/bore.h
+
 grep -q '^CONFIG_SCHED_BORE=y' arch/arm64/configs/gki_defconfig || \
   echo 'CONFIG_SCHED_BORE=y' >> arch/arm64/configs/gki_defconfig
 
@@ -25,7 +30,7 @@ HOOKS=(
   '#include <trace/hooks/dtask.h>'
   'EXPORT_TRACEPOINT_SYMBOL_GPL(sched_stat_runtime)'
 )
-for l in "${HOOKS[@]}"; do
+for l in "\${HOOKS[@]}"; do
   grep -qF "$l" kernel/sched/fair.c || die "BORE 补丁误删 OEM 内容: $l"
 done
 
