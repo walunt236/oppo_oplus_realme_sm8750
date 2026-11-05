@@ -272,7 +272,7 @@ if [ -f out/arch/arm64/boot/Image ]; then
   assert_ikcfg CONFIG_MQ_IOSCHED_ADIOS
   assert_ikcfg CONFIG_SECTION_MISMATCH_WARN_ONLY
   assert_ikcfg CONFIG_PER_VMA_LOCK_STATS
-  grep -qF "CONFIG_LOCALVERSION=\"${LOCALVER}\"" <<< "$IKCFG_TEXT" || die "Image 内嵌 LOCALVERSION 与预期不符（期望 ${LOCALVER}），产物配置陈旧，中止"
+  grep -qF "CONFIG_LOCALVERSION=\"${LOCALVER:-}\"" <<< "$IKCFG_TEXT" || die "Image 内嵌 LOCALVERSION 与预期不符（期望 ${LOCALVER:-}），产物配置陈旧，中止"
   info "Image 内嵌配置校验通过"
 fi
 
