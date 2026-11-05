@@ -48,12 +48,6 @@ fi
 OEM_BRANCH="oneplus/sm8750_b_16.0.0_oneplus_13"
 
 mkdir -p "$HOME/.cache_patches"
-info "后台预查询 AOSP 最新标签..."
-( for u in https://android.googlesource.com/kernel/common https://github.com/aosp-mirror/kernel_common; do
-    out=$(git -c http.proxy= ls-remote --tags --sort=-v:refname "$u" 'refs/tags/android15-6.6.*_r00' 2>/dev/null | head -1 | awk '{print $2}' | sed 's|refs/tags/||')
-    if [ -n "$out" ]; then echo "$out"; break; fi
-  done > "$HOME/.cache_patches/latest_aosp_tag" ) &
-AOSP_TAG_PID=$!
 
 if [ -d "common/.git" ]; then
   info "common 源码已存在，reset到OEM"
@@ -97,45 +91,55 @@ git config user.name "github-actions[bot]"
 
 wait $VENDOR_PID || { error "vendor_modules 拉取失败，中止构建"; exit 1; }
 
-# AOSP 上游合并
-info "拉取 Google AOSP android15-6.6 ..."
-wait $AOSP_TAG_PID 2>/dev/null || true
-LATEST_AOSP_TAG=$(cat "$HOME/.cache_patches/latest_aosp_tag" 2>/dev/null)
-LATEST_AOSP_TAG=${LATEST_AOSP_TAG:-android15-6.6}
-grep -qE '^android15-6\.6(\.[0-9]+_r[0-9]+)?$' <<< "$LATEST_AOSP_TAG" || { warn "AOSP 标签格式异常: $LATEST_AOSP_TAG，回退 android15-6.6"; LATEST_AOSP_TAG=android15-6.6; }
-info "AOSP 最新发布标签: $LATEST_AOSP_TAG"
-FETCH_OK=0
-for url in https://android.googlesource.com/kernel/common https://github.com/aosp-mirror/kernel_common; do
-  for i in 1 2; do
-    if git -c http.proxy= fetch --depth=1 --no-tags "$url" "$LATEST_AOSP_TAG"; then
-      FETCH_OK=1
-      info "AOSP 源码来自: $url"
-      break
-    fi
-    warn "AOSP fetch 失败(第${i}次, $url)，5 秒后重试..."
-    sleep 5
-  done
-  if [ "$FETCH_OK" -eq 1 ]; then break; fi
-done
-if [[ "$FETCH_OK" -eq 1 ]]; then
-  UPSTREAM_SUBLEVEL=$(git show FETCH_HEAD:Makefile | sed -n 's/^SUBLEVEL\s*=\s*\([0-9]*\).*/\1/p')
-  UPSTREAM_SUBLEVEL=${UPSTREAM_SUBLEVEL:-0}
-  echo "UPSTREAM_SUBLEVEL=$UPSTREAM_SUBLEVEL" >> "$GITHUB_ENV"
-  if git merge FETCH_HEAD --no-edit -X ours --allow-unrelated-histories; then
-    info "AOSP上游合并成功"
-  else
-    warn "存在冲突，自动保留 OEM 版本..."
-    git diff --name-only --diff-filter=U | xargs -r git checkout --ours --
-    git add -A
-    git commit -m "Merge AOSP $LATEST_AOSP_TAG, keep OEM" || {
-      error "AOSP 合并提交失败，中止构建"
-      exit 1
-    }
-  fi
+# 骁龙(QCOM)上游合并：以 OnePlus BSP 基线 tag 为基点，三方合并到最新骁龙 tag
+UPSTREAM_SUBLEVEL=""
+if [[ "${QCOM_MERGE:-true}" != "true" ]]; then
+  info "QCOM_MERGE=false，跳过骁龙上游合并"
 else
-  error "AOSP fetch 失败（直连+代理 3 次均不可达），上游合并为必需项，中止构建"
-  exit 1
+  info "查询骁龙上游最新标签..."
+  QCOM_LATEST_TAG=$(git -c http.proxy= ls-remote --tags --sort=-v:refname "$QCOM_REPO" 'refs/tags/android15-6.6-*_r*' 2>/dev/null \
+    | grep -v '\^{}' | awk '{{print $2}}' | sed 's|refs/tags/||' | head -1)
+  QCOM_LATEST_TAG=${QCOM_LATEST_TAG:-$QCOM_BASE_TAG}
+  info "骁龙上游: 基线 $QCOM_BASE_TAG -> 目标 $QCOM_LATEST_TAG"
+  echo "QCOM_LATEST_TAG=$QCOM_LATEST_TAG" >> "$GITHUB_ENV"
+
+  if [[ "$QCOM_LATEST_TAG" == "$QCOM_BASE_TAG" ]]; then
+    info "骁龙上游无新版本，跳过合并"
+  else
+    git remote remove qcom 2>/dev/null || true
+    git remote add qcom "$QCOM_REPO"
+    for tag in "$QCOM_BASE_TAG" "$QCOM_LATEST_TAG"; do
+      retry "骁龙 $tag 拉取" 3 5 git -c http.proxy= fetch --filter=blob:none --no-tags --depth=1 qcom \
+        "refs/tags/$tag:refs/qcom/$tag" || die "骁龙上游标签 $tag 拉取失败"
+    done
+
+    info "生成骁龙补丁: $QCOM_BASE_TAG -> $QCOM_LATEST_TAG"
+    git diff --binary "refs/qcom/$QCOM_BASE_TAG" "refs/qcom/$QCOM_LATEST_TAG" > /tmp/qcom_upstream.patch 2>/dev/null || true
+    info "骁龙补丁规模: $(wc -l < /tmp/qcom_upstream.patch) 行"
+
+    QCOM_CONFLICT_DIR="${OUT_DIR:-$HOME/share/out}/qcom_conflicts"
+    mkdir -p "$QCOM_CONFLICT_DIR"
+    : > "$QCOM_CONFLICT_DIR/conflicts.txt"
+
+    if git apply -3 /tmp/qcom_upstream.patch > /tmp/qcom_apply.log 2>&1; then
+      info "骁龙上游合并完成: $(grep -c '^Applied patch' /tmp/qcom_apply.log) 个文件干净应用"
+    else
+      grep -oP "Applied patch to '\K[^']+(?=' with conflicts)" /tmp/qcom_apply.log | sort -u > "$QCOM_CONFLICT_DIR/conflicts.txt" || true
+      while IFS= read -r f; do
+        git checkout HEAD -- "$f" 2>/dev/null || true
+      done < "$QCOM_CONFLICT_DIR/conflicts.txt"
+      cp -f /tmp/qcom_apply.log "$QCOM_CONFLICT_DIR/apply.log" 2>/dev/null || true
+      warn "骁龙上游合并: $(grep -c '^Applied patch' /tmp/qcom_apply.log) 个文件应用，$(wc -l < "$QCOM_CONFLICT_DIR/conflicts.txt") 个冲突已回退本地版本"
+    fi
+
+    TARGET_SUBLEVEL=$(git show "refs/qcom/$QCOM_LATEST_TAG:Makefile" 2>/dev/null | sed -n 's/^SUBLEVEL\s*=\s*\([0-9]*\).*/\1/p')
+    if [[ -n "$TARGET_SUBLEVEL" ]]; then
+      sed -i "s/^SUBLEVEL = .*/SUBLEVEL = $TARGET_SUBLEVEL/" Makefile
+      info "内核版本已同步骁龙上游: 6.6.$TARGET_SUBLEVEL"
+    fi
+  fi
 fi
+echo "UPSTREAM_SUBLEVEL=$UPSTREAM_SUBLEVEL" >> "$GITHUB_ENV"
 
 OEM_VERSION=$(sed -n 's/^VERSION\s*=\s*\(.*\)/\1/p' Makefile)
 OEM_PATCHLEVEL=$(sed -n 's/^PATCHLEVEL\s*=\s*\(.*\)/\1/p' Makefile)
