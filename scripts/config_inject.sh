@@ -58,6 +58,8 @@ echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" >> "$DCFG"
 # 核心集成（task_struct 缺 sched_ext_entity），开启只会引用不存在的符号
 sed -i '/^CONFIG_SCHED_CLASS_EXT/d' "$DCFG"
 echo "# CONFIG_SCHED_CLASS_EXT is not set" >> "$DCFG"
+# ARM64 cluster 调度：让 EAS 感知多 cluster 拓扑（默认选项，纯拓扑感知）
+echo "CONFIG_SCHED_CLUSTER=y" >> "$DCFG"
 sed -i 's/check_defconfig//' ./common/build.config.gki || true
 echo "CONFIG_HEADERS_INSTALL=n" >> "$DCFG"
 if [ "${AFDO_ENABLE:-false}" = "true" ] && [ -s "$HOME/.cache_patches/afdo/kernel.afdo" ]; then
