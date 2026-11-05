@@ -142,11 +142,13 @@ else
       info "骁龙上游合并完成: $(grep -c '^Applied patch' /tmp/qcom_apply.log) 个文件干净应用"
     else
       grep -oP "Applied patch to '\K[^']+(?=' with conflicts)" /tmp/qcom_apply.log | sort -u > "$QCOM_CONFLICT_DIR/conflicts.txt" || true
+      # 冲突文件采用骁龙版本：它们引用的新符号（如 is_user_task / pgmigration_err）
+      # 只存在于新代码里，保留本地旧版会导致新代码找不到声明
       while IFS= read -r f; do
-        git checkout HEAD -- "$f" 2>/dev/null || true
+        git checkout "refs/qcom/$QCOM_LATEST_TAG" -- "$f" 2>/dev/null || true
       done < "$QCOM_CONFLICT_DIR/conflicts.txt"
       cp -f /tmp/qcom_apply.log "$QCOM_CONFLICT_DIR/apply.log" 2>/dev/null || true
-      warn "骁龙上游合并: $(grep -c '^Applied patch' /tmp/qcom_apply.log) 个文件应用，$(wc -l < "$QCOM_CONFLICT_DIR/conflicts.txt") 个冲突已回退本地版本"
+      warn "骁龙上游合并: $(grep -c '^Applied patch' /tmp/qcom_apply.log) 个文件应用，$(wc -l < "$QCOM_CONFLICT_DIR/conflicts.txt") 个冲突已采用骁龙版本"
     fi
 
     TARGET_SUBLEVEL=$(git show "refs/qcom/$QCOM_LATEST_TAG:Makefile" 2>/dev/null | sed -n 's/^SUBLEVEL\s*=\s*\([0-9]*\).*/\1/p' || true)
