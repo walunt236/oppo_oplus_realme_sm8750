@@ -98,7 +98,7 @@ wait $VENDOR_PID || { error "vendor_modules 拉取失败，中止构建"; exit 1
 # 基线 tag 不写死：从一加提交信息里的 Based on QCOM release TAG 自动解析
 if [[ -z "${QCOM_BASE_TAG:-}" ]]; then
   QCOM_BASE_TAG=$(
-    git log -1 --format=%B 2>/dev/null | grep -oE 'android15-6\.6-[0-9]{4}-[0-9]{2}_r[0-9]+' | sed -n '1p'
+    git log -1 --format=%B 2>/dev/null | grep -oE 'android[0-9]+-[0-9][0-9.]*-[0-9]{4}-[0-9]{2}_r[0-9]+' | sed -n '1p'
   ) || QCOM_BASE_TAG=""
   [[ -n "$QCOM_BASE_TAG" ]] && info "从一加提交信息解析出基线 tag: $QCOM_BASE_TAG"
 fi
@@ -111,8 +111,11 @@ if [[ "${QCOM_MERGE:-true}" != "true" ]]; then
   info "QCOM_MERGE=false，跳过骁龙上游合并"
 else
   info "查询骁龙上游最新标签..."
-  QCOM_RAW_TAGS=$(git -c http.proxy= ls-remote --tags "$QCOM_REPO" 'refs/tags/android15-6.6-*_r*' 2>/dev/null) || QCOM_RAW_TAGS=""
-  QCOM_LATEST_TAG=$(printf '%s\n' "$QCOM_RAW_TAGS" | sed 's|refs/tags/||' | grep -oE 'android15-6\.6-202[4-9]-[0-9]{2}_r[0-9]+$' | sort -V | tail -1) || true
+  QCOM_SERIES=$(printf '%s' "$QCOM_BASE_TAG" | sed -n 's/^\(android[0-9]\+-[0-9.]\+\)-[0-9]\{4\}-[0-9]\{2\}_r[0-9]\+$/\1/p')
+  QCOM_SERIES=${QCOM_SERIES:-android15-6.6}
+  info "骁龙分支系列: $QCOM_SERIES"
+  QCOM_RAW_TAGS=$(git -c http.proxy= ls-remote --tags "$QCOM_REPO" "refs/tags/${QCOM_SERIES}-*_r*" 2>/dev/null) || QCOM_RAW_TAGS=""
+  QCOM_LATEST_TAG=$(printf '%s\n' "$QCOM_RAW_TAGS" | sed 's|refs/tags/||' | grep -oE "${QCOM_SERIES//./\\.}-202[4-9]-[0-9]{2}_r[0-9]+$"' | sort -V | tail -1) || true
   QCOM_LATEST_TAG=${QCOM_LATEST_TAG:-$QCOM_BASE_TAG}
   info "骁龙上游: 基线 $QCOM_BASE_TAG -> 目标 $QCOM_LATEST_TAG"
   echo "QCOM_LATEST_TAG=$QCOM_LATEST_TAG" >> "$GITHUB_ENV"
