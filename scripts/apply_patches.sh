@@ -215,44 +215,10 @@ if [[ "$LZ4KD_ENABLE" == "true" ]]; then
   fi
 fi
 
-# 风驰引擎及优化补丁批
+# 风驰引擎已移除：它本质是对 sched_ext 的魔改替换（删掉标准 struct_ops 换成 hmbird），
+# 改为启用内核标准 sched_ext，用社区 BPF 调度器（scx_lavd / scx_bpfland 等）替代。
 cd "$GITHUB_WORKSPACE/kernel_workspace"
-
-PATCH_FILE=$(find_latest "$WILD_DIR/oneplus/hmbird/" "fengchi_OP13_*.patch")
-if [ -z "$PATCH_FILE" ]; then
-  warn "oneplus/hmbird 目录未找到风驰补丁，开始全仓搜索..."
-  PATCH_FILE=$(find_latest "$WILD_DIR" "fengchi_OP13_*.patch")
-fi
-if [ -z "$PATCH_FILE" ]; then
-  error "未匹配到一加13风驰补丁"
-  exit 1
-fi
-
-info "匹配风驰补丁: $PATCH_FILE"
-sed -i 's/\r$//' "$PATCH_FILE"
-
 cd common
-find . -name "*.rej" -delete 2>/dev/null || true
-
-info "注入风驰引擎补丁..."
-# 先 dry-run：补丁与当前基线严重不符时整块跳过，避免"半应用"导致编译失败
-FENGCHI_DRY=$(patch -p1 -F 3 -f --dry-run < "$PATCH_FILE" 2>&1) || true
-FENGCHI_BAD=$(printf '%s\n' "$FENGCHI_DRY" | grep -oE '[0-9]+ out of [0-9]+ hunks' | awk '{s+=$1} END{print s+0}' || true)
-if [ "${FENGCHI_BAD:-0}" -gt 20 ]; then
-  warn "风驰补丁与当前内核基线不匹配（预计 $FENGCHI_BAD 处失败），整块跳过以保持代码一致"
-else
-  patch -p1 -F 3 -f < "$PATCH_FILE" || true
-fi
-FENGCHI_HUNKS=$(find . -name "*.rej" -exec awk '/^@@/{n++} END{print n+0}' {} \; 2>/dev/null | awk '{s+=$1} END{print s+0}')
-if [ "${FENGCHI_HUNKS:-0}" -gt 0 ]; then
-  warn "风驰补丁有 ${FENGCHI_HUNKS} 个 hunk 未应用（其余已生效）:"
-  find . -name "*.rej" 2>/dev/null | while IFS= read -r f; do
-    echo "  --- ${f} ---" | tee -a "$LOG_FILE"
-    head -12 "$f" | tee -a "$LOG_FILE"
-  done
-else
-  info "风驰补丁全部应用"
-fi
 
 info "注入 Overwriter 补丁..."
 OVERWRITER_PATCH=$(find_latest "$WILD_DIR/oneplus/hmbird/" "overwriter.patch")
@@ -310,7 +276,7 @@ patch -p1 --forward -f < /tmp/mm_vmpressure.patch || warn "mm_vmpressure 应用�
 
 TOTAL_REJ=0
 TOTAL_REJ_FILES=0
-count_rejs "风驰批"
+count_rejs "基础补丁"
 
 mkdir -p "$HOME/.cache_patches/aosp"
 for hash in 47f80469849a 5fddd8e6a0a7 0a9eef42768c 71bd6942e33f ef0123e95425 7abe312b37cf 6a42fccfc2bc d43ee181a478 5c8ecdcfbfb0 c5d6863c9aba 9eecad532ad3; do
@@ -328,20 +294,7 @@ for hash in 47f80469849a 5fddd8e6a0a7 0a9eef42768c 71bd6942e33f ef0123e95425 7ab
 done
 count_rejs "AOSP"
 
-mkdir -p "$HOME/.cache_patches/palazik"
-for hash in e8400a0 a09e19e; do
-  if [ ! -s "$HOME/.cache_patches/palazik/$hash.patch" ]; then
-    curl -fSL --retry 3 --retry-delay 5 --retry-all-errors --connect-timeout 10 --max-time 30 -o "$HOME/.cache_patches/palazik/$hash.patch" "https://github.com/palazik/android_kernel_common_oneplus_sm8750/commit/$hash.patch" 2>/dev/null || rm -f "$HOME/.cache_patches/palazik/$hash.patch"
-  fi
-done
-for hash in e8400a0 a09e19e; do
-  if [ -s "$HOME/.cache_patches/palazik/$hash.patch" ]; then
-    patch -p1 --forward -F 3 < "$HOME/.cache_patches/palazik/$hash.patch" 2>/dev/null || warn "palazik/$hash.patch 应用失败，继续..."
-  else
-    warn "palazik/$hash.patch 缺失或为空，跳过"
-  fi
-done
-count_rejs "Palazik"
+# palazik 补丁已停用（try_to_steal_block 与 6.6.143 的 fallback 流程不兼容，收益小）
 
 UNICODE_PATCH=$(find_latest "$WILD_DIR/" "*unicode*6.1+*.patch")
 if [ -z "$UNICODE_PATCH" ]; then
@@ -369,7 +322,6 @@ else
   info "所有补丁干净应用（0 reject）"
 fi
 
-info "风驰引擎补丁注入完成"
 
 # Droidspaces
 if [[ "$DROIDSPACES_ENABLE" != "false" ]]; then
