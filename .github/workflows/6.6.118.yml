@@ -80,7 +80,7 @@ on:
         type: boolean
         default: false
       bore_enable:
-        description: 'BORE 调度器（突发任务优先，默认关）'
+        description: 'BORE 调度器 [WIP 不可用：6.6.143 适配未完成，开启会编译失败]'
         required: true
         type: boolean
         default: false
