@@ -88,6 +88,7 @@ if [ -f out/.config ]; then
 fi
 
 if [ "${AFDO_ENABLE:-false}" = "true" ] && [ -n "$AFDO_PROFILE" ]; then assert_config CONFIG_AUTOFDO_CLANG "AutoFDO (AUTOFDO_CLANG)"; fi
+if [ "${AFDO_GENERATE:-0}" = "1" ]; then assert_config CONFIG_AUTOFDO_CLANG "AutoFDO 生成模式"; fi
 assert_config CONFIG_SECTION_MISMATCH_WARN_ONLY "SECTION_MISMATCH_WARN_ONLY (modpost mismatch 降级警告)"
 assert_config CONFIG_LTO_CLANG_THIN "ThinLTO"
 assert_config CONFIG_HZ_300 "HZ=300"
@@ -287,6 +288,17 @@ if [ -f out/arch/arm64/boot/Image ]; then
   assert_ikcfg CONFIG_PER_VMA_LOCK_STATS
   grep -qF "CONFIG_LOCALVERSION=\"${LOCALVER:-}\"" <<< "$IKCFG_TEXT" || die "Image 内嵌 LOCALVERSION 与预期不符（期望 ${LOCALVER:-}），产物配置陈旧，中止"
   info "Image 内嵌配置校验通过"
+fi
+
+if [ "${AFDO_GENERATE:-0}" = "1" ]; then
+  AFDO_DIR="$HOME/.cache_patches/afdo"
+  mkdir -p "$AFDO_DIR"
+  SNAP="$AFDO_DIR/vmlinux-$(date +%Y%m%d-%H%M)"
+  cp out/vmlinux "$SNAP"
+  ln -sf "$(basename "$SNAP")" "$AFDO_DIR/vmlinux.latest"
+  info "可采样 vmlinux 已保存: $SNAP ($(du -h "$SNAP" | cut -f1))"
+  info "vmlinux 指纹: $(md5sum "$SNAP" | cut -c1-16)"
+  info "采样并转换后，用 afdo_mode=use 重建"
 fi
 
 info "内核镜像编译完成"
