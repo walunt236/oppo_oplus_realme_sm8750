@@ -180,13 +180,25 @@ jobs:
           MODE="${AFDO_MODE:-off}"
           case "$MODE" in
             use)
-              if [ ! -s "$AFDO_DIR/kernel.afdo" ]; then
-                echo "[ERROR] afdo_mode=use 但缺少采样文件：$AFDO_DIR/kernel.afdo" | tee -a "$LOG_FILE"
+              # 优先用自采样本；没有则回退到内核源码树自带的 Google GKI profile
+              PROFILE_SRC=""
+              if [ -s "$AFDO_DIR/kernel.afdo" ]; then
+                PROFILE_SRC="$AFDO_DIR/kernel.afdo"
+                echo "[INFO] AutoFDO 使用自采样本" | tee -a "$LOG_FILE"
+              else
+                IN_TREE="$GITHUB_WORKSPACE/kernel_workspace/common/android/gki/aarch64/afdo/kernel.afdo"
+                if [ -s "$IN_TREE" ]; then
+                  PROFILE_SRC="$IN_TREE"
+                  echo "[INFO] AutoFDO 使用内核树自带的 GKI profile: $(du -h "$IN_TREE" | cut -f1)" | tee -a "$LOG_FILE"
+                fi
+              fi
+              if [ -z "$PROFILE_SRC" ]; then
+                echo "[ERROR] afdo_mode=use 但既无自采样本也无源码树 profile" | tee -a "$LOG_FILE"
                 exit 1
               fi
-              AFDO_HASH=$(md5sum "$AFDO_DIR/kernel.afdo" | cut -c1-8)
+              AFDO_HASH=$(md5sum "$PROFILE_SRC" | cut -c1-8)
               AFDO_LINK="$AFDO_DIR/kernel-$AFDO_HASH.afdo"
-              ln -sf kernel.afdo "$AFDO_LINK"
+              ln -sf "$PROFILE_SRC" "$AFDO_LINK"
               echo "AFDO_PROFILE=$AFDO_LINK" >> "$GITHUB_ENV"
               # 把对应的 vmlinux 也传下去，供构建期做 profile 新鲜度校验
               if [ -f "$AFDO_DIR/vmlinux.latest" ]; then
