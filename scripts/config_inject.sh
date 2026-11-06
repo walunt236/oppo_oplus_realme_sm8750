@@ -144,6 +144,10 @@ grep -q "CFLAGS_REMOVE_configs.o" ./common/kernel/Makefile || \
   echo 'CFLAGS_REMOVE_configs.o := -flto=thin -fsplit-lto-unit' >> ./common/kernel/Makefile
 
 apply_patch_file "other_patch/zram_recomp_default.patch" /tmp/zram_recomp.patch strict "zram 默认 zstd 重压缩算法补丁"
+# zram 源码级调整：开机首次 disksize 不低于 6GB + 重压缩按绝对占用判断
+if [ -f ./common/drivers/block/zram/zram_drv.c ]; then
+  python3 "$GITHUB_WORKSPACE/scripts/zram_src_tune.py" ./common/drivers/block/zram/zram_drv.c ||     warn "zram 源码调整失败（不影响构建，行为保持上游）"
+fi
 apply_patch_file "other_patch/damon_reclaim_defaults.patch" /tmp/damon_reclaim.patch strict "DAMON_RECLAIM 默认参数补丁"
 cat >> "$DCFG" << 'OEMDEPENDS'
 CONFIG_UBSAN=y
