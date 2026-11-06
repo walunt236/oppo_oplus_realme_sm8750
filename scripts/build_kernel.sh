@@ -3,6 +3,18 @@ set -euo pipefail
 source "$(dirname "$0")/common.sh"
 export AFDO_PROFILE="${AFDO_PROFILE:-}"
 
+# AutoFDO 模式判定（GitHub 注入的 AFDO_GENERATE 是 true/false 字符串）
+AFDO_GEN_ONLY=0
+case "${AFDO_GENERATE:-}" in
+  true|1) AFDO_GEN_ONLY=1 ;;
+esac
+AFDO_PROFILE_VALID=0
+if [ "${AFDO_ENABLE:-false}" = "true" ] && [ "$AFDO_GEN_ONLY" -eq 0 ] \
+   && [ -n "${AFDO_PROFILE:-}" ] && [ -s "${AFDO_PROFILE:-}" ]; then
+  AFDO_PROFILE_VALID=1
+fi
+info "AutoFDO 状态: ENABLE=${AFDO_ENABLE:-false} GENERATE=${AFDO_GENERATE:-false} GEN_ONLY=$AFDO_GEN_ONLY PROFILE=${AFDO_PROFILE:-} 有效=$AFDO_PROFILE_VALID"
+
 # 增量编译 mtime 钳制
 cd "$GITHUB_WORKSPACE/kernel_workspace/common"
 PATCH_HASH=$(git status --porcelain 2>/dev/null | md5sum | cut -d' ' -f1 || true)
@@ -87,8 +99,8 @@ if [ -f out/.config ]; then
   fi
 fi
 
-if [ "${AFDO_ENABLE:-false}" = "true" ] && [ -n "$AFDO_PROFILE" ]; then assert_config CONFIG_AUTOFDO_CLANG "AutoFDO (AUTOFDO_CLANG)"; fi
-if [ "${AFDO_GENERATE:-0}" = "1" ]; then assert_config CONFIG_AUTOFDO_CLANG "AutoFDO 生成模式"; fi
+if [ "$AFDO_PROFILE_VALID" -eq 1 ]; then assert_config CONFIG_AUTOFDO_CLANG "AutoFDO (AUTOFDO_CLANG)"; fi
+case "${AFDO_GENERATE:-}" in true|1) assert_config CONFIG_AUTOFDO_CLANG "AutoFDO 生成模式" ;; esac
 assert_config CONFIG_SECTION_MISMATCH_WARN_ONLY "SECTION_MISMATCH_WARN_ONLY (modpost mismatch 降级警告)"
 assert_config CONFIG_LTO_CLANG_THIN "ThinLTO"
 assert_config CONFIG_HZ_300 "HZ=300"
@@ -190,7 +202,7 @@ if [ -n "$AFDO_PROFILE" ] && [ -n "${AFDO_VMLINUX:-}" ] && [ -f "$AFDO_VMLINUX" 
       warn "profile 匹配率 <50%——内核已演进，建议重新采样重建 profile"
     fi
   fi
-elif [ "${AFDO_ENABLE:-false}" = "true" ] && [ -n "$AFDO_PROFILE" ]; then
+elif [ "$AFDO_PROFILE_VALID" -eq 1 ]; then
   warn "AutoFDO 新鲜度防线未启用（AFDO_VMLINUX 未配置或文件不存在）"
 fi
 # 编译器参数官方工具链支持验证
@@ -201,7 +213,7 @@ if clang -mcpu=oryon-1 -### -c /dev/null 2>&1 | grep -qE "error|unknown|not supp
 else
   echo "  ✓ -mcpu=oryon-1（Oryon 目标）" | tee -a "$LOG_FILE"
 fi
-if [ "${AFDO_ENABLE:-false}" = "true" ] && [ -n "$AFDO_PROFILE" ]; then
+if [ "$AFDO_PROFILE_VALID" -eq 1 ]; then
   if clang -fprofile-sample-use="$AFDO_PROFILE" -fprofile-sample-accurate -fdebug-info-for-profiling -mllvm -enable-fs-discriminator=true -mllvm -sample-profile-max-propagate-iterations=300 -### -c /dev/null 2>&1 | grep -qE "error|unknown|not supported"; then
     echo "  ✗ AutoFDO 参数不被工具链支持！" | tee -a "$LOG_FILE"
     exit 1
@@ -247,7 +259,7 @@ if echo 'int f(int *a, int n){int s=0; for(int i=0;i<n;i++) s+=a[i]; return s;}'
 else
   echo "  ✗ 循环向量化未生效！" | tee -a "$LOG_FILE"
 fi
-if [ "${AFDO_ENABLE:-false}" = "true" ] && [ -n "$AFDO_PROFILE" ]; then
+if [ "$AFDO_PROFILE_VALID" -eq 1 ]; then
   if echo 'static int g(int x){return x*3;} int f(int x){return g(x)+1;}' | clang -x c - -S -o /dev/null -O3 -fprofile-sample-use="$AFDO_PROFILE" -Rpass=inline 2>&1 | grep -q "inlined into"; then
     echo "  ✓ AutoFDO profile 驱动 inline 生效（-Rpass=inline + 自采 profile）" | tee -a "$LOG_FILE"
   else
@@ -263,7 +275,7 @@ else
 fi
 AFDO_CFLAGS=""
 AFDO_MAKE_ARGS=""
-if [ "${AFDO_ENABLE:-false}" = "true" ] && [ -n "$AFDO_PROFILE" ]; then
+if [ "$AFDO_PROFILE_VALID" -eq 1 ]; then
   AFDO_CFLAGS="-fprofile-sample-accurate -mllvm -sample-profile-max-propagate-iterations=300"
   AFDO_MAKE_ARGS="CLANG_AUTOFDO_PROFILE=$AFDO_PROFILE"
 fi
@@ -278,7 +290,7 @@ if [ -f out/arch/arm64/boot/Image ]; then
     exit 1
   fi
   assert_ikcfg CONFIG_ZRAM_MEMORY_TRACKING
-  if [ "${AFDO_ENABLE:-false}" = "true" ] && [ -n "$AFDO_PROFILE" ]; then assert_ikcfg CONFIG_AUTOFDO_CLANG; fi
+  if [ "$AFDO_PROFILE_VALID" -eq 1 ]; then assert_ikcfg CONFIG_AUTOFDO_CLANG; fi
   assert_ikcfg CONFIG_HZ_300
   assert_ikcfg CONFIG_TCP_CONG_BBR3
   assert_ikcfg CONFIG_IP_SET
@@ -290,7 +302,7 @@ if [ -f out/arch/arm64/boot/Image ]; then
   info "Image 内嵌配置校验通过"
 fi
 
-if [ "${AFDO_GENERATE:-0}" = "1" ]; then
+if [ "$AFDO_GEN_ONLY" -eq 1 ]; then
   AFDO_DIR="$HOME/.cache_patches/afdo"
   mkdir -p "$AFDO_DIR"
   SNAP="$AFDO_DIR/vmlinux-$(date +%Y%m%d-%H%M)"
