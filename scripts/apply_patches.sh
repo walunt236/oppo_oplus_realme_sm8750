@@ -188,7 +188,14 @@ mkdir -p fs/f2fs/lz4armv8
 cp "$ACCEL_DIR/lz4accel.c" fs/f2fs/lz4armv8/
 cp "$ACCEL_DIR/lz4accel.h" fs/f2fs/lz4armv8/
 
-git apply --reject --whitespace=nowarn 001-lz4.patch > /tmp/lz4_patch.log 2>&1 || true
+# 001-lz4.patch 的 IDEA 导出有两个不可修复的段：
+#   1) lz4armv8.S 的二进制段在 11283 行被截断（corrupt binary patch）
+#   2) lz4hc_compress.c 的删除段因上下文不符而失败
+# 已剔除这两段并固化为标准 git 补丁，可严格应用；.S 由下面单独拷贝，旧文件单独删除。
+LZ4_NEON_PATCH="$GITHUB_WORKSPACE/other_patch/lz4_1.10_neon.patch"
+[ -f "$LZ4_NEON_PATCH" ] || die "缺少 lz4 1.10/NEON 补丁: $LZ4_NEON_PATCH"
+git apply --whitespace=nowarn "$LZ4_NEON_PATCH" > /tmp/lz4_patch.log 2>&1 || die "lz4 1.10/NEON 补丁应用失败（详见 /tmp/lz4_patch.log）"
+rm -f lib/lz4/lz4hc_compress.c
 # 002-zstd.patch 里针对 lib/zstd/common/portability_macros.h 的 hunk 是上游 1.5.7 的
 # Apple/i386 移植性改动，而本树 zstd 已更新（__GNUC__ >= 11），套用等于降级，故剔除该段。
 python3 - "$PWD/002-zstd.patch" <<'PYZSTD' > /tmp/002-zstd-filtered.patch
