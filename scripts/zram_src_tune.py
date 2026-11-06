@@ -41,7 +41,7 @@ CLAMP_ADD = r'''	/* 首次初始化强制不低于 zram_boot_min_mb */
 
 MAXPAGES_OLD = "#define ZRAM_AUTO_RECOMP_MAX_PAGES\t50000"
 MAXPAGES_NEW = ("#define ZRAM_AUTO_RECOMP_MAX_PAGES\t8192\n"
-                "/* 内存压力低于 5%% 时不重压缩，避免空转烧 CPU */\n"
+                "/* 内存压力低于 5% 时不重压缩，避免空转烧 CPU */\n"
                 "#define ZRAM_AUTO_RECOMP_PSI_LOW\t500")
 
 LOW_OLD = "\tif (usage < ZRAM_AUTO_RECOMP_USAGE_MID &&\n\t    psi_some < ZRAM_AUTO_RECOMP_PSI_HIGH) {"
