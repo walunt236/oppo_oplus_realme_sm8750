@@ -60,7 +60,7 @@ sed -i '/^CONFIG_SCHED_CLASS_EXT/d' "$DCFG"
 echo "# CONFIG_SCHED_CLASS_EXT is not set" >> "$DCFG"
 # ARM64 cluster 调度：让 EAS 感知多 cluster 拓扑（默认选项，纯拓扑感知）
 echo "CONFIG_SCHED_CLUSTER=y" >> "$DCFG"
-sed -i 's/check_defconfig//' ./common/build.config.gki || true
+# （已移除无效的 check_defconfig 删除动作：本流水线不调用 build/build.sh，该校验从未执行）
 sed -i '/^CONFIG_HEADERS_INSTALL/d' "$DCFG"
 echo "CONFIG_HEADERS_INSTALL=y" >> "$DCFG"
 # KSU preinit 需要 out/usr/include（Kbuild 用 wildcard 检测），必须保留
