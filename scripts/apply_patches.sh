@@ -76,9 +76,15 @@ elif [[ "$KSU_TYPE" == "ksunext" ]]; then
     sed -i "s/KSU_VERSION_TAG_FALLBACK := v0.0.1/KSU_VERSION_TAG_FALLBACK := $KSU_GIT_TAG/g" kernel/Kbuild
     grep -q "KSU_VERSION_TAG_FALLBACK := $KSU_GIT_TAG" kernel/Kbuild || warn "KSU_VERSION_TAG_FALLBACK 锚点未命中（上游 Kbuild 已变动）"
   fi
-  cd ../common/drivers/kernelsu
+  cd ../common
   cp "$GITHUB_WORKSPACE/other_patch/apk_sign.patch" apk_sign.patch
-  patch -p2 -N -F 3 < apk_sign.patch || true
+  patch -p1 -N -F 3 < apk_sign.patch > /tmp/apk_sign.log 2>&1 || true
+  if grep -q 'pershoot Manager' drivers/kernelsu/manager/apk_sign.c 2>/dev/null; then
+    info "多管理器签名支持已生效（pershoot / Wild_KSU）"
+  else
+    warn "apk_sign 补丁未生效（明细 /tmp/apk_sign.log）"
+  fi
+  rm -f apk_sign.patch
 elif [[ "$KSU_TYPE" == "ksu" ]]; then
   info "配置原版 KernelSU..."
   sync_repo "https://github.com/tiann/KernelSU.git" KernelSU main
@@ -154,7 +160,12 @@ if [[ "$SUSFS_ENABLE" == "true" ]]; then
 
     sed -i '/^    unsigned int nr_subpages = __PAGE_SIZE \/ PAGE_SIZE;$/d; /^    pagemap_entry_t \*res = NULL;$/d' ./fs/proc/task_mmu.c || true
 
-    patch -p1 -N -F 3 < 69_hide_stuff.patch || true
+    patch -p1 -N -F 3 < 69_hide_stuff.patch > /tmp/hide.log 2>&1 || true
+    if grep -q 'show_vma_header_prefix_fake' ./fs/proc/task_mmu.c 2>/dev/null; then
+      info "隐藏 VMA 功能已生效"
+    else
+      warn "69_hide_stuff 补丁未生效（明细 /tmp/hide.log）"
+    fi
     cd ..
   else
     info "跳过 susfs 配置（未选择 KernelSU）"
@@ -164,7 +175,12 @@ if [[ "$SUSFS_ENABLE" == "true" ]]; then
     info "为原版 KernelSU 添加补丁..."
     cp ./susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./KernelSU/ || warn "susfs-ksu 补丁文件缺失，跳过补丁应用"
     cd ./KernelSU
-    patch -p1 < 10_enable_susfs_for_ksu.patch || true
+    patch -p1 < 10_enable_susfs_for_ksu.patch > /tmp/susfs_ksu.log 2>&1 || true
+    if grep -rqs 'susfs' kernel/Kconfig 2>/dev/null; then
+      info "SUSFS ↔ KernelSU 集成已生效"
+    else
+      warn "susfs-ksu 集成补丁未生效（明细 /tmp/susfs_ksu.log）"
+    fi
   fi
 fi
 
