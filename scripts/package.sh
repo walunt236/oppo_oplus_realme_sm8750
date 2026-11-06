@@ -97,6 +97,12 @@ if [[ ! -f ./Image ]]; then
   error "未找到内核镜像文件"
   exit 1
 fi
+IMG_SIZE=$(stat -c%s ./Image 2>/dev/null || echo 0)
+if [ "$IMG_SIZE" -lt 20000000 ]; then
+  error "内核镜像异常（$IMG_SIZE 字节，小于 20MB），疑似构建产物损坏"
+  exit 1
+fi
+info "内核镜像大小: $(awk -v s="$IMG_SIZE" 'BEGIN{printf "%.1f MB", s/1048576}')"
 
 case "$KSU_TYPE" in
   sukisu)   KSU_TYPENAME="SukiSU" ;;
@@ -136,6 +142,8 @@ EOF
 
 rm -f ../AnyKernel3-*.zip
 zip -r "../$AK3_NAME" ./*
+PKG_SIZE=$(stat -c%s "../$AK3_NAME" 2>/dev/null || echo 0)
+info "安装包大小: $(awk -v s="$PKG_SIZE" 'BEGIN{printf "%.1f MB", s/1048576}')"
 echo "ak3name=$AK3_NAME" >> "$GITHUB_OUTPUT"
 
 # 产物输出目录：build.env 的 OUT_DIR（默认 $HOME/share/out）
