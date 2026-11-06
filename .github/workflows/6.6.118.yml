@@ -188,6 +188,10 @@ jobs:
               AFDO_LINK="$AFDO_DIR/kernel-$AFDO_HASH.afdo"
               ln -sf kernel.afdo "$AFDO_LINK"
               echo "AFDO_PROFILE=$AFDO_LINK" >> "$GITHUB_ENV"
+              # 把对应的 vmlinux 也传下去，供构建期做 profile 新鲜度校验
+              if [ -f "$AFDO_DIR/vmlinux.latest" ]; then
+                echo "AFDO_VMLINUX=$AFDO_DIR/vmlinux.latest" >> "$GITHUB_ENV"
+              fi
               echo "[INFO] AutoFDO 使用已有采样: $AFDO_LINK (hash=$AFDO_HASH)" | tee -a "$LOG_FILE"
               ;;
             generate)
