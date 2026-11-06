@@ -410,6 +410,24 @@ done
 
 info "调度器优化完成 (16ms PELT / NEXT_BUDDY / HRTICK / SIS_PROP / CACHE_HOT_BUDDY / LB_MIN)"
 
+# f2fs：默认启用 ATGC（年龄阈值 GC）与 GC_MERGE（GC 写合并）
+# 两者在 6.6.143 里已存在，但只能通过挂载参数开启；而挂载参数由 ROM 的 fstab 决定。
+# 这里在 default_options() 之后、解析挂载参数之前打开，ROM 显式传 nogc_merge 仍可覆盖。
+F2FS_ATGC_PATCH='" + D + "GITHUB_WORKSPACE/other_patch/f2fs_default_atgc_gcmerge.patch'
+if [ -f "$F2FS_ATGC_PATCH" ]; then
+  if patch -p1 --forward -F 3 < "$F2FS_ATGC_PATCH" >/dev/null 2>&1; then
+    info "f2fs ATGC / GC_MERGE 默认值已启用"
+  else
+    warn "f2fs ATGC / GC_MERGE 补丁应用失败（继续构建）"
+  fi
+fi
+if grep -q 'set_opt(sbi, ATGC);' fs/f2fs/super.c 2>/dev/null && \
+   grep -q 'set_opt(sbi, GC_MERGE);' fs/f2fs/super.c 2>/dev/null; then
+  info "f2fs ATGC / GC_MERGE 校验通过"
+else
+  warn "f2fs ATGC / GC_MERGE 未生效，GC 行为与上游一致"
+fi
+
 # 新 glibc（如 26.04 的 2.42）下 strchr() 对 const 参数返回 const char*，
 # 会与内核自带 -Werror 冲突，导致 resolve_btfids 编译失败。
 LIBBPF="$GITHUB_WORKSPACE/kernel_workspace/common/tools/lib/bpf/libbpf.c"
