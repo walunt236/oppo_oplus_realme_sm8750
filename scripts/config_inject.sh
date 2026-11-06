@@ -52,8 +52,8 @@ LZ4KDCFG
 fi
 
 # 性能模式：关闭热路径上的加固与计费（CFI/KASAN 因模块 ABI 限制必须保留）
-if [ "@@{PERF_MODE:-balanced}" = "aggressive" ]; then
-  cat >> "@@DCFG" << 'PERFMODE'
+if [ "${PERF_MODE:-balanced}" = "aggressive" ]; then
+  cat >> "$DCFG" << 'PERFMODE'
 # 性能模式：栈变量零初始化（-ftrivial-auto-var-init=zero，每函数开销）
 CONFIG_INIT_STACK_NONE=y
 # CONFIG_INIT_STACK_ALL_ZERO is not set
