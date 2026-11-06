@@ -205,10 +205,10 @@ jobs:
               META="$AFDO_DIR/kernel.afdo.meta"
               if [ -f "$META" ] && [ -f "$AFDO_DIR/vmlinux.latest" ]; then
                 NM_BIN=""
-                for c in "$HOME"/.toolchains/*/bin/llvm-nm; do [ -x "$c" ] && NM_BIN="$c" && break; done
+                NM_BIN=$(ls "$HOME"/.toolchains/*/bin/llvm-nm 2>/dev/null | head -1)
                 if [ -n "$NM_BIN" ]; then
                   M1=$(sed -n "s/^vmlinux_syms=//p" "$META")
-                  M2=$("$NM_BIN" --defined-only "$AFDO_DIR/vmlinux.latest" 2>/dev/null | awk "$2 ~ /^[tT]$/ {print $1, $3}" | md5sum | cut -c1-16)
+                  M2=$("$NM_BIN" --defined-only "$AFDO_DIR/vmlinux.latest" 2>/dev/null | awk '$2 ~ /^[tT]$/ {print $1, $3}' | md5sum | cut -c1-16)
                   if [ -n "$M1" ] && [ "$M1" != "$M2" ]; then
                     echo "[ERROR] 自采 profile 与当前 vmlinux 符号表不一致（采样后内核已变过）" | tee -a "$LOG_FILE"
                     echo "        处理：在对应 generate 内核上重新采样，或删除 kernel.afdo* 后改用源码树 GKI profile" | tee -a "$LOG_FILE"
