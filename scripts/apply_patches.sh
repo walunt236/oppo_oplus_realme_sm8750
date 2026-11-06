@@ -410,14 +410,17 @@ PELTEOF
 sed -i 's/SCHED_FEAT(NEXT_BUDDY, false)/SCHED_FEAT(NEXT_BUDDY, true)/' kernel/sched/features.h
 sed -i 's/SCHED_FEAT(HRTICK, false)/SCHED_FEAT(HRTICK, true)/' kernel/sched/features.h
 sed -i 's/SCHED_FEAT(SIS_PROP, false)/SCHED_FEAT(SIS_PROP, true)/' kernel/sched/features.h
-for feat in NEXT_BUDDY HRTICK SIS_PROP; do
+# 缓存局部性 + 减少无谓迁移（省电取向）
+sed -i 's/SCHED_FEAT(CACHE_HOT_BUDDY, false)/SCHED_FEAT(CACHE_HOT_BUDDY, true)/' kernel/sched/features.h
+sed -i 's/SCHED_FEAT(LB_MIN, false)/SCHED_FEAT(LB_MIN, true)/' kernel/sched/features.h
+for feat in NEXT_BUDDY HRTICK SIS_PROP CACHE_HOT_BUDDY LB_MIN; do
   grep -q "SCHED_FEAT($feat, true)" kernel/sched/features.h || {
     error "调度优化 $feat 注入失败（上游已改名，需人工核对），中止构建"
     exit 1
   }
 done
 
-info "调度器优化完成 (16ms PELT / NEXT_BUDDY / HRTICK / SIS_PROP)"
+info "调度器优化完成 (16ms PELT / NEXT_BUDDY / HRTICK / SIS_PROP / CACHE_HOT_BUDDY / LB_MIN)"
 
 # 新 glibc（如 26.04 的 2.42）下 strchr() 对 const 参数返回 const char*，
 # 会与内核自带 -Werror 冲突，导致 resolve_btfids 编译失败。
