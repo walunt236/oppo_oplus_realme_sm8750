@@ -17,7 +17,9 @@ info "AutoFDO 状态: ENABLE=${AFDO_ENABLE:-false} GENERATE=${AFDO_GENERATE:-fal
 
 # 增量编译 mtime 钳制
 cd "$GITHUB_WORKSPACE/kernel_workspace/common"
-PATCH_HASH=$(git status --porcelain 2>/dev/null | md5sum | cut -d' ' -f1 || true)
+# 指纹必须包含文件内容：git status 只给路径，改同一批文件的内容会被漏掉，
+# 导致增量构建复用旧 .o（实测：zram 调优改动未进内核）
+PATCH_HASH=$( { git status --porcelain 2>/dev/null; git diff 2>/dev/null; } | md5sum | cut -d' ' -f1 || true )
 echo "PATCH_HASH=$PATCH_HASH" >> "$GITHUB_ENV"
 STORED=$(cut -d'|' -f1 "$HOME/.cache_patches/build_state" 2>/dev/null || true)
 if [[ "$STORED" == "$PATCH_HASH" ]]; then
