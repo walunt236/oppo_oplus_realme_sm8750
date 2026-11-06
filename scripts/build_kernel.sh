@@ -41,9 +41,12 @@ fi
 
 make_defconfig() {
   make -j${BUILD_JOBS} LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" LD="ld.lld" HOSTLD=ld.lld O=out gki_defconfig
-  # KSU 的 preinit 依赖 out/usr/include/linux/unistd.h（Kbuild 用 wildcard 检测），
-  # 这里不再删除；下面会显式跑一次 headers_install 保证它存在。
-  :
+  # KSU 的 preinit 依赖 out/usr/include/linux/unistd.h（Kbuild 用 wildcard 检测）。
+  # 显式安装一次 UAPI 头，保证 KSU 的 Kbuild 解析时它已存在。
+  make -j${BUILD_JOBS} LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- \
+    CC="ccache clang" LD="ld.lld" HOSTLD=ld.lld O=out headers_install \
+    >/dev/null 2>&1 || die "headers_install 失败"
+  [ -f out/usr/include/linux/unistd.h ] || die "out/usr/include 未生成，KSU preinit 将不可用"
 }
 
 make_defconfig
