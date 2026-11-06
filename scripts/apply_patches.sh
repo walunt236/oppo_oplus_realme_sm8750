@@ -188,8 +188,21 @@ mkdir -p fs/f2fs/lz4armv8
 cp "$ACCEL_DIR/lz4accel.c" fs/f2fs/lz4armv8/
 cp "$ACCEL_DIR/lz4accel.h" fs/f2fs/lz4armv8/
 
-git apply --reject --whitespace=nowarn 001-lz4.patch || true
-patch -p1 -t -F 3 < 002-zstd.patch || true
+git apply --reject --whitespace=nowarn 001-lz4.patch > /tmp/lz4_patch.log 2>&1 || true
+patch -p1 -t -F 3 < 002-zstd.patch >> /tmp/lz4_patch.log 2>&1 || true
+
+# 001-lz4.patch 是 IDEA 格式的 378KB 大补丁，包含 LZ4 1.10 升级 + NEON 加速接线。
+# 它必然部分失败，但加速接线是关键；这里显式检查是否真的接上了。
+LZ4_REJ=$(find lib -name "*.rej" 2>/dev/null | wc -l)
+if grep -rqs "lz4_decompress_asm" lib/lz4/; then
+  info "lz4 ARMv8 解压加速已接线（补丁残留 ${LZ4_REJ} 个 reject）"
+else
+  warn "lz4 加速未接线：001-lz4.patch 的关键改动没有落上"
+fi
+if [ "$LZ4_REJ" -gt 0 ]; then
+  warn "lz4/zstd 补丁有 ${LZ4_REJ} 个 hunk 未应用，明细见 /tmp/lz4_patch.log"
+  grep -aE "error:|FAILED" /tmp/lz4_patch.log 2>/dev/null | head -3 || true
+fi
 
 if [ -f lib/lz4/lz4armv8/lz4armv8.S ] && [ -f lib/zstd/zstd_common_module.c ] && [ -s lib/lz4/lz4armv8/lz4accel.c ] && [ -s lib/lz4/lz4armv8/lz4accel.h ]; then
   info "lz4 NEON 解压 + zstd 就位"
