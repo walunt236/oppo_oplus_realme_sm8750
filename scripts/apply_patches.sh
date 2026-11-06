@@ -109,7 +109,7 @@ mkdir -p "$HOME/.cache_patches"
 
 if [[ "$SUSFS_ENABLE" == "true" && "$KSU_TYPE" != "none" ]]; then
   SUSFS_BRANCH="gki-${QCOM_SERIES:-android15-6.6}"
-sync_repo "https://github.com/ShirkNeko/susfs4ksu.git" "$SUSFS_CACHE_DIR" "$SUSFS_BRANCH" || true &
+  sync_repo "https://github.com/ShirkNeko/susfs4ksu.git" "$SUSFS_CACHE_DIR" "$SUSFS_BRANCH" || true &
 fi
 sync_repo "https://github.com/mrcxlinux/kernel_patches.git" "$ZRAM_CACHE_DIR" || true &
 if [[ "$LZ4KD_ENABLE" == "true" ]]; then
