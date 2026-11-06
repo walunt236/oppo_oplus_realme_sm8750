@@ -39,7 +39,7 @@ trap 'rm -rf "$TMP"' EXIT
 i=0
 PARTS=()
 for f in "$@"; do
-  [ -s "$f" ] || { echo "[ERROR] 找不到 perf.data: $f"; exit 1; }
+  [ -f "$f" ] && [ -s "$f" ] || { echo "[ERROR] 找不到 perf.data 或不是普通文件: $f"; exit 1; }
   i=$((i+1))
   echo "[INFO] 转换第 $i 份: $f ($(du -h "$f" | cut -f1))"
   python3 "$HERE/perf2afdo.py" "$f" "$VMLINUX" "$TMP/p$i.afdo"
