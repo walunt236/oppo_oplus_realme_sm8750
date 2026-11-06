@@ -432,18 +432,15 @@ fi
 # 来源 WildKernels/kernel_patches，均已验证适用于 6.6.143
 F2FS_GC_TUNING="$GITHUB_WORKSPACE/other_patch/f2fs_gc_tuning.patch"
 if [ -f "$F2FS_GC_TUNING" ]; then
-  if patch -p1 --forward -F 3 < "$F2FS_GC_TUNING" >/dev/null 2>&1; then
-    info "f2fs GC 调优已应用"
-  else
-    warn "f2fs GC 调优补丁应用失败（继续构建）"
-  fi
+  patch -p1 --forward -F 3 < "$F2FS_GC_TUNING" > /tmp/f2fs_gc_tuning.log 2>&1 || true
 fi
 if grep -q 'DEF_GC_THREAD_URGENT_SLEEP_TIME.50' fs/f2fs/gc.h 2>/dev/null && \
    grep -q 'msecs_to_jiffies(6)' fs/f2fs/f2fs.h 2>/dev/null && \
    grep -q 'DEF_MIN_FSYNC_BLOCKS.20' fs/f2fs/segment.h 2>/dev/null; then
-  info "f2fs GC 调优校验通过"
+  info "f2fs GC 调优已生效（紧急休眠 50ms / 拥塞 6ms / fsync 批量 20）"
 else
   warn "f2fs GC 调优未完全生效"
+  grep -E 'FAILED|rej' /tmp/f2fs_gc_tuning.log 2>/dev/null | head -3 || true
 fi
 
 # 新 glibc（如 26.04 的 2.42）下 strchr() 对 const 参数返回 const char*，
