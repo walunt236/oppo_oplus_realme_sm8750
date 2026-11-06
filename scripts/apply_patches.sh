@@ -90,11 +90,12 @@ elif [[ "$KSU_TYPE" == "ksu" ]]; then
   sync_repo "https://github.com/tiann/KernelSU.git" KernelSU main
   link_ksu_kernel KernelSU
   cd ./KernelSU
-  # 默认对齐官方 release：内核 KSU 版本号必须与官方 APK 一致，
+  # 默认跟 main 最新：有新特性优先。release 对齐模式保留但默认关闭，
+  # 因为 SUSFS 补丁需同步对比，release tag 上补丁常失配。
   # 且内核编译期写死的签名哈希(c371061b...)对应 release 密钥；
   # 开发版(main)APK 由 CI 用临时密钥签名，内核永远认不出。
   # SUSFS 补丁另需对齐到发布同期提交（见下方 SUSFS 同步段）。
-  KSU_CHANNEL="${KSU_CHANNEL:-release}"
+  KSU_CHANNEL="${KSU_CHANNEL:-main}"
   KSU_REL_TAG=""
   KSU_TAG_DATE=""
   if [ "$KSU_CHANNEL" = "release" ]; then
