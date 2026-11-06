@@ -225,8 +225,10 @@ jobs:
             generate)
               echo "AFDO_PROFILE=" >> "$GITHUB_ENV"
               echo "[INFO] AutoFDO 生成模式：本次内核带 -fdebug-info-for-profiling，用于采集" | tee -a "$LOG_FILE"
-              echo "[INFO] 设备采样: simpleperf record -a -b -e cycles -f 1000 -o /sdcard/perf.data --duration 300" | tee -a "$LOG_FILE"
-              echo "[INFO] 采完把 perf.data 放到编译机，执行 scripts/afdo_collect.sh perf.data" | tee -a "$LOG_FILE"
+              echo "[INFO] 设备采样（刷入本内核后执行，勿在 AFDO 内核上采样）：" | tee -a "$LOG_FILE"
+              echo "[INFO]   simpleperf record -a -o /data/local/tmp/perf_data.data --duration 1800" | tee -a "$LOG_FILE"
+              echo "[INFO] 采完把 perf.data 放到编译机: scripts/afdo_collect.sh perf.data ..." | tee -a "$LOG_FILE"
+              echo "[INFO] 详见 docs/AUTOFDO.md" | tee -a "$LOG_FILE"
               ;;
             *)
               echo "AFDO_PROFILE=" >> "$GITHUB_ENV"
