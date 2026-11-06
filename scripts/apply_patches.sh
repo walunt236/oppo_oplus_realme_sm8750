@@ -424,6 +424,25 @@ fi
 if grep -q 'set_opt(sbi, ATGC);' fs/f2fs/super.c 2>/dev/null && \
    grep -q 'set_opt(sbi, GC_MERGE);' fs/f2fs/super.c 2>/dev/null; then
   info "f2fs ATGC / GC_MERGE 校验通过"
+fi
+
+# f2fs GC 三项调优：紧急休眠 500→50ms、拥塞超时 20→6ms、fsync 批量 8→20
+# 来源 WildKernels/kernel_patches，均已验证适用于 6.6.143
+F2FS_GC_TUNING="$GITHUB_WORKSPACE/other_patch/f2fs_gc_tuning.patch"
+if [ -f "$F2FS_GC_TUNING" ]; then
+  if patch -p1 --forward -F 3 < "$F2FS_GC_TUNING" >/dev/null 2>&1; then
+    info "f2fs GC 调优已应用"
+  else
+    warn "f2fs GC 调优补丁应用失败（继续构建）"
+  fi
+fi
+if grep -q 'DEF_GC_THREAD_URGENT_SLEEP_TIME.50' fs/f2fs/gc.h 2>/dev/null && \
+   grep -q 'msecs_to_jiffies(6)' fs/f2fs/f2fs.h 2>/dev/null && \
+   grep -q 'DEF_MIN_FSYNC_BLOCKS.20' fs/f2fs/segment.h 2>/dev/null; then
+  info "f2fs GC 调优校验通过"
+else
+  warn "f2fs GC 调优未完全生效"
+fi
 else
   warn "f2fs ATGC / GC_MERGE 未生效，GC 行为与上游一致"
 fi
