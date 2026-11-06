@@ -189,7 +189,21 @@ cp "$ACCEL_DIR/lz4accel.c" fs/f2fs/lz4armv8/
 cp "$ACCEL_DIR/lz4accel.h" fs/f2fs/lz4armv8/
 
 git apply --reject --whitespace=nowarn 001-lz4.patch > /tmp/lz4_patch.log 2>&1 || true
-patch -p1 -t -F 3 < 002-zstd.patch >> /tmp/lz4_patch.log 2>&1 || true
+# 002-zstd.patch 里针对 lib/zstd/common/portability_macros.h 的 hunk 是上游 1.5.7 的
+# Apple/i386 移植性改动，而本树 zstd 已更新（__GNUC__ >= 11），套用等于降级，故剔除该段。
+python3 - "$PWD/002-zstd.patch" <<'PYZSTD' > /tmp/002-zstd-filtered.patch
+import re, sys
+src = open(sys.argv[1], encoding="utf-8", errors="replace").read()
+parts = re.split(r"(?m)^diff --git ", src)
+out = [parts[0]]
+for p in parts[1:]:
+    if p.startswith("a/lib/zstd/common/portability_macros.h"):
+        sys.stderr.write("[INFO] 跳过 zstd portability_macros.h（上游旧版本，本树已更新）\n")
+        continue
+    out.append("diff --git " + p)
+sys.stdout.write("".join(out))
+PYZSTD
+patch -p1 -t -F 3 < /tmp/002-zstd-filtered.patch >> /tmp/lz4_patch.log 2>&1 || true
 
 # 001-lz4.patch 是 IDEA 格式的 378KB 大补丁，包含 LZ4 1.10 升级 + NEON 加速接线。
 # 它必然部分失败，但加速接线是关键；这里显式检查是否真的接上了。
