@@ -123,7 +123,7 @@ if [ "${PERF_MODE:-balanced}" = "aggressive" ]; then
   # ABI 保护：这两个选项控制 task_struct 字段，关掉必然破坏厂商模块，任何模式都不许关
   grep -q '^CONFIG_TASK_IO_ACCOUNTING=y' out/.config || die "ABI 保护：CONFIG_TASK_IO_ACCOUNTING 被关闭，会破坏 task_struct 布局"
   grep -q '^CONFIG_TASK_XACCT=y' out/.config || die "ABI 保护：CONFIG_TASK_XACCT 被关闭，会破坏 task_struct 布局"
-  info "性能模式校验通过：栈零初始化 / usercopy / slab 加固 / IO 与中断计费 均已关闭"
+  info "性能模式校验通过：栈零初始化 / usercopy / slab 加固 / 中断时间计费 均已关闭（IO 计费按 ABI 保留）"
 else
   info "标准模式：加固项保持上游默认（栈零初始化等）"
 fi
