@@ -37,6 +37,7 @@ gproxy() {
 }
 
 PENDING_SYNC="$HOME/.cache_patches/pending_sync"
+export PENDING_SYNC  # 由 apply_patches.sh 读取
 
 sync_repo() {
   local url="$1" dir="$2" branch="${3:-main}"
