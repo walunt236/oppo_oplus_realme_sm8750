@@ -20,20 +20,36 @@ if [[ "$KPM_ENABLE" == 'kpn' ]]; then
   info "应用 KP-N 并修补内核..."
   cd kernel_workspace/common/out/arch/arm64/boot
   KPN_OK=0
-  curl -fSL --retry 3 --retry-delay 5 --retry-all-errors --connect-timeout 10 --max-time 30 -o kptools-linux "https://github.com/KernelSU-Next/KPatch-Next/releases/latest/download/kptools-linux" && KPN_OK=1 || {
-    warn "KPN kptools 下载失败，跳过 KPN 修补，继续打包原始内核"
-  }
-  if [[ "$KPN_OK" -eq 1 ]]; then
-    curl -fSL --retry 3 --retry-delay 5 --retry-all-errors --connect-timeout 10 --max-time 30 -o kpimg-linux "https://github.com/KernelSU-Next/KPatch-Next/releases/latest/download/kpimg-linux" && KPN_OK=1 || {
-      warn "KPN kpimg 下载失败，跳过 KPN 修补，继续打包原始内核"
-      KPN_OK=0
-    }
+  # 首选：cctv18 的定期构建（release 比上游新，2026-06 vs 2026-01）
+  if curl -fSL --retry 3 --retry-delay 5 --retry-all-errors --connect-timeout 10 --max-time 60 \
+       -o kpn.zip "https://github.com/cctv18/KPatch-Next/releases/latest/download/kpn.zip" 2>/dev/null; then
+    rm -rf kpn-ext && mkdir -p kpn-ext
+    unzip -q -o kpn.zip -d kpn-ext 2>/dev/null || true
+    KPN_T=$(find kpn-ext -type f -name "kptools*" -print -quit)
+    KPN_I=$(find kpn-ext -type f -name "kpimg*" -print -quit)
+    if [ -n "$KPN_T" ] && [ -n "$KPN_I" ]; then
+      cp -f "$KPN_T" kptools-linux && cp -f "$KPN_I" kpimg-linux && KPN_OK=1
+      info "KP-N 工具取自 cctv18 定期构建"
+    fi
   fi
-  if [[ "$KPN_OK" -eq 1 ]]; then
+  # 回退：上游 KernelSU-Next 的独立产物
+  if [ "$KPN_OK" -eq 0 ]; then
+    warn "cctv18 构建不可用，回退上游 release"
+    curl -fSL --retry 3 --retry-delay 5 --retry-all-errors --connect-timeout 10 --max-time 30 \
+      -o kptools-linux "https://github.com/KernelSU-Next/KPatch-Next/releases/latest/download/kptools-linux" 2>/dev/null || true
+    curl -fSL --retry 3 --retry-delay 5 --retry-all-errors --connect-timeout 10 --max-time 30 \
+      -o kpimg-linux "https://github.com/KernelSU-Next/KPatch-Next/releases/latest/download/kpimg-linux" 2>/dev/null || true
+    [ -s kptools-linux ] && [ -s kpimg-linux ] && KPN_OK=1
+  fi
+  if [ "$KPN_OK" -eq 1 ]; then
     chmod +x ./kptools-linux
-    ./kptools-linux -p -i ./Image -k ./kpimg-linux -o ./oImage
-    rm -f Image
-    mv oImage Image
+    if ./kptools-linux -p -i ./Image -k ./kpimg-linux -o ./oImage; then
+      rm -f Image && mv oImage Image
+    else
+      warn "KP-N 修补失败，继续打包原始内核"
+    fi
+  else
+    warn "KPN 工具不可用，跳过 KP-N 修补"
   fi
 fi
 
@@ -90,9 +106,6 @@ case "$KSU_TYPE" in
   *)        KSU_TYPENAME="none" ;;
 esac
 
-if [[ "$KPM_ENABLE" == 'kpn' ]] && [[ "${KPN_OK:-0}" -eq 1 ]]; then
-  curl -fSL --retry 3 --retry-delay 5 --retry-all-errors --connect-timeout 10 --max-time 30 -o kpn.zip "https://github.com/cctv18/KPatch-Next/releases/latest/download/kpn.zip" || warn "kpn.zip 下载失败，跳过 KPN 模块"
-fi
 
 BUILD_DATE="$(TZ=Asia/Shanghai date +%Y%m%d)"
 AK3_NAME="AnyKernel3-${KSU_TYPENAME}-${KSUVER}-${KERNEL_VERSION_FULL}-${KERNEL_SUFFIX}-${BUILD_DATE}.zip"
