@@ -424,6 +424,8 @@ fi
 if grep -q 'set_opt(sbi, ATGC);' fs/f2fs/super.c 2>/dev/null && \
    grep -q 'set_opt(sbi, GC_MERGE);' fs/f2fs/super.c 2>/dev/null; then
   info "f2fs ATGC / GC_MERGE 校验通过"
+else
+  warn "f2fs ATGC / GC_MERGE 未生效，GC 行为与上游一致"
 fi
 
 # f2fs GC 三项调优：紧急休眠 500→50ms、拥塞超时 20→6ms、fsync 批量 8→20
@@ -442,9 +444,6 @@ if grep -q 'DEF_GC_THREAD_URGENT_SLEEP_TIME.50' fs/f2fs/gc.h 2>/dev/null && \
   info "f2fs GC 调优校验通过"
 else
   warn "f2fs GC 调优未完全生效"
-fi
-else
-  warn "f2fs ATGC / GC_MERGE 未生效，GC 行为与上游一致"
 fi
 
 # 新 glibc（如 26.04 的 2.42）下 strchr() 对 const 参数返回 const char*，
