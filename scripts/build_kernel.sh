@@ -119,8 +119,10 @@ if [ "${PERF_MODE:-balanced}" = "aggressive" ]; then
   if grep -q '^CONFIG_HARDENED_USERCOPY=y' out/.config; then die "性能模式：HARDENED_USERCOPY 仍开启"; fi
   if grep -q '^CONFIG_SLAB_FREELIST_HARDENED=y' out/.config; then die "性能模式：SLAB_FREELIST_HARDENED 仍开启"; fi
   if grep -q '^CONFIG_SLAB_FREELIST_RANDOM=y' out/.config; then die "性能模式：SLAB_FREELIST_RANDOM 仍开启"; fi
-  if grep -q '^CONFIG_TASK_IO_ACCOUNTING=y' out/.config; then die "性能模式：TASK_IO_ACCOUNTING 仍开启"; fi
   if grep -q '^CONFIG_IRQ_TIME_ACCOUNTING=y' out/.config; then die "性能模式：IRQ_TIME_ACCOUNTING 仍开启"; fi
+  # ABI 保护：这两个选项控制 task_struct 字段，关掉必然破坏厂商模块，任何模式都不许关
+  grep -q '^CONFIG_TASK_IO_ACCOUNTING=y' out/.config || die "ABI 保护：CONFIG_TASK_IO_ACCOUNTING 被关闭，会破坏 task_struct 布局"
+  grep -q '^CONFIG_TASK_XACCT=y' out/.config || die "ABI 保护：CONFIG_TASK_XACCT 被关闭，会破坏 task_struct 布局"
   info "性能模式校验通过：栈零初始化 / usercopy / slab 加固 / IO 与中断计费 均已关闭"
 else
   info "标准模式：加固项保持上游默认（栈零初始化等）"
