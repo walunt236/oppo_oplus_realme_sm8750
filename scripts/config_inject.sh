@@ -54,30 +54,36 @@ CONFIG_ZRAM_DEF_COMP_LZ4=y
 CONFIG_ZRAM_DEF_COMP="lz4"
 ZRAMDEFCFG
 
-# 性能模式：关闭热路径上的加固与计费（CFI/KASAN 因模块 ABI 限制必须保留）
-if [ "${PERF_MODE:-balanced}" = "aggressive" ]; then
-  cat >> "$DCFG" << 'PERFMODE'
-# 性能模式：栈变量零初始化（-ftrivial-auto-var-init=zero，每函数开销）
-CONFIG_INIT_STACK_NONE=y
-# CONFIG_INIT_STACK_ALL_ZERO is not set
-# CONFIG_INIT_STACK_ALL_PATTERN is not set
-# usercopy 越界检查
+# 性能模式：分级注入（CFI/KASAN/SCS/PAC 因模块 ABI 限制必须保留）
+# 实测：INIT_STACK_ALL_ZERO 关闭会导致本机型启动挂起（厂商代码依赖栈零初始化），
+#       因此 aggressive 档不含它；需要验证时可单独选 stack_only。
+case "${PERF_MODE:-balanced}" in
+  aggressive)
+    cat >> "$DCFG" << 'PERFMODE'
+# usercopy 越界检查（每次 copy_to/from_user 一次范围校验）
 # CONFIG_HARDENED_USERCOPY is not set
-# slab 空闲链表加固（每次分配都有异或/随机化开销）
+# slab 空闲链表加固（每次分配有异或/随机化开销）
 # CONFIG_SLAB_FREELIST_HARDENED is not set
 # CONFIG_SLAB_FREELIST_RANDOM is not set
-# 注意：CONFIG_TASK_IO_ACCOUNTING / CONFIG_TASK_XACCT 绝不能关闭！
-# 二者控制 task_struct 里的 ioac 与 acct_rss_mem1/acct_vm_mem1/acct_timexpd 字段
-# （include/linux/sched.h），关闭会让 task_struct 缩小 24 字节，
-# 导致厂商预编译模块按旧偏移读 task 字段 -> 启动期死锁（实测卡开机 logo）。
 # 中断时间计费
 # CONFIG_IRQ_TIME_ACCOUNTING is not set
 PERFMODE
-  info "性能模式已启用：关闭 栈零初始化 / usercopy 检查 / slab 加固 / 中断时间计费（IO 计费因 ABI 保留）"
-  warn "安全提示：以上加固关闭后，内核本地漏洞利用难度下降；CFI 与 KASAN 因模块 ABI 限制仍保留"
-else
-  info "标准模式：保留上游全部加固（栈零初始化 / usercopy / slab / 计费）"
-fi
+    info "性能模式(aggressive)：关闭 usercopy 检查 / slab 加固 / 中断时间计费"
+    warn "安全提示：以上加固关闭后，内核本地漏洞利用难度下降；CFI/KASAN/SCS/PAC 仍保留"
+    ;;
+  stack_only)
+    cat >> "$DCFG" << 'PERFSTACK'
+# 实验档：仅关闭栈变量零初始化（-ftrivial-auto-var-init=zero）
+CONFIG_INIT_STACK_NONE=y
+# CONFIG_INIT_STACK_ALL_ZERO is not set
+# CONFIG_INIT_STACK_ALL_PATTERN is not set
+PERFSTACK
+    info "实验模式(stack_only)：仅关闭栈变量零初始化"
+    ;;
+  *)
+    info "标准模式：保留上游全部加固（栈零初始化 / usercopy / slab / 计费）"
+    ;;
+esac
 
 echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" >> "$DCFG"
 # 骁龙 6.6.14x 已从 kernel/sched/Makefile 移除 ext.o，开启该选项会导致
