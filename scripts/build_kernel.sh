@@ -160,6 +160,11 @@ KCFLAGS_EXTRA+=" -mllvm -enable-gvn-hoist -mllvm -enable-load-pre -mllvm -polly-
 KCFLAGS_EXTRA+=" -mllvm -enable-loopinterchange=true -mllvm -enable-ipra -mllvm -enable-phi-of-ops -mllvm -enable-dse-partial-store-merging"
 KCFLAGS_EXTRA+=" -mllvm -enable-aarch64-lsr-cost-opt -mllvm -enable-aarch64-or-like-select -mllvm -vectorizer-min-trip-count=2"
 KCFLAGS_EXTRA+=" -mllvm -unroll-threshold=300 -mllvm -enable-loop-distribute"
+# Oryon 特调外挂（对应 LLVM #172422，2025-12-31）：
+# 调度模型里 LoopMicroOpBufferSize=0 会让 getUnrollingPreferences() 提前 return，
+# 导致运行时 trip count 的循环永不展开。命令行传入 PartialUnrollingThreshold 会走
+# 第一个分支、以相同数值 16 绕过该判断，等价于上游把模型值改成 16。
+KCFLAGS_EXTRA+=" -mllvm -partial-unrolling-threshold=16"
 
 # KSU_NO_PREINIT 兜底已移除：headers_install 后 preinit 会被编译，
 # 其符号真实存在，SUSFS 的 exec.c 钩子可以直接链接。
