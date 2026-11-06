@@ -61,6 +61,7 @@ echo "# CONFIG_SCHED_CLASS_EXT is not set" >> "$DCFG"
 # ARM64 cluster 调度：让 EAS 感知多 cluster 拓扑（默认选项，纯拓扑感知）
 echo "CONFIG_SCHED_CLUSTER=y" >> "$DCFG"
 sed -i 's/check_defconfig//' ./common/build.config.gki || true
+sed -i '/^CONFIG_HEADERS_INSTALL/d' "$DCFG"
 echo "CONFIG_HEADERS_INSTALL=y" >> "$DCFG"
 # KSU preinit 需要 out/usr/include（Kbuild 用 wildcard 检测），必须保留
 if [ "${AFDO_ENABLE:-false}" = "true" ] && [ -s "$HOME/.cache_patches/afdo/kernel.afdo" ]; then
