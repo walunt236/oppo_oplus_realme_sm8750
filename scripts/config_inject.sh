@@ -73,7 +73,7 @@ CONFIG_INIT_STACK_NONE=y
 # 中断时间计费
 # CONFIG_IRQ_TIME_ACCOUNTING is not set
 PERFMODE
-  info "性能模式已启用：关闭 栈零初始化 / usercopy 检查 / slab 加固 / IO 与中断计费"
+  info "性能模式已启用：关闭 栈零初始化 / usercopy 检查 / slab 加固 / 中断时间计费（IO 计费因 ABI 保留）"
   warn "安全提示：以上加固关闭后，内核本地漏洞利用难度下降；CFI 与 KASAN 因模块 ABI 限制仍保留"
 else
   info "标准模式：保留上游全部加固（栈零初始化 / usercopy / slab / 计费）"
