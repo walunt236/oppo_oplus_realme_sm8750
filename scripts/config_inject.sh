@@ -280,7 +280,5 @@ echo "# CONFIG_SHUFFLE_PAGE_ALLOCATOR is not set" >> "$DCFG"
 
 info "已关闭 INIT_ON_ALLOC / SHUFFLE_PAGE_ALLOCATOR（性能优先）"
 
-g 中没有 CONFIG_CMDLINE，跳过启动参数注入"
-fi
 
 info "配置注入完成"
