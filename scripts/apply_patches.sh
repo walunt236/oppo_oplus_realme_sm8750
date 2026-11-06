@@ -171,7 +171,7 @@ fi
 # lz4/zstd
 cd "$GITHUB_WORKSPACE/kernel_workspace/common"
 
-cp "$ZRAM_CACHE_DIR/zram/001-lz4.patch" . || exit 1
+# 001-lz4.patch 已固化为 other_patch/lz4_1.10_neon.patch，不再从上游拉取
 cp "$ZRAM_CACHE_DIR/zram/002-zstd.patch" . || exit 1
 
 mkdir -p lib/lz4/lz4armv8
