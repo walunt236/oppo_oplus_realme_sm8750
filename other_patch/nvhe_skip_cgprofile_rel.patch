@@ -1,0 +1,14 @@
+--- a/arch/arm64/tools/gen-hyprel.c
++++ b/arch/arm64/tools/gen-hyprel.c
+@@ -436,8 +436,11 @@ static void emit_all_relocs(void)
+ 	for_each_section(shdr) {
+ 		switch (elf32toh(shdr->sh_type)) {
+ 		case SHT_REL:
++			/* AutoFDO 生成 .rel.llvm.* 元数据节，跳过而非报错 */
++			if (!strncmp(section_name(shdr), ".rel.llvm.", 10))
++				break;
+ 			fatal_error("Unexpected SHT_REL section \"%s\"",
+ 				section_name(shdr));
+ 		case SHT_RELA:
+ 			emit_rela_section(shdr);
+ 			break;
