@@ -271,4 +271,13 @@ HZ300CFG
 
 echo "CONFIG_PER_VMA_LOCK_STATS=y" >> ./common/arch/arm64/configs/gki_defconfig
 
+# 性能优先：关闭两项加固带来的固定开销。
+#   INIT_ON_ALLOC_DEFAULT_ON : 每次内存分配强制清零，典型 1~5% 开销
+#   SHUFFLE_PAGE_ALLOCATOR   : 页分配随机化，破坏缓存局部性，典型 1~2% 开销
+# 均可通过启动参数恢复（init_on_alloc=1 / page_alloc.shuffle=1）。
+echo "# CONFIG_INIT_ON_ALLOC_DEFAULT_ON is not set" >> "$DCFG"
+echo "# CONFIG_SHUFFLE_PAGE_ALLOCATOR is not set" >> "$DCFG"
+
+info "已关闭 INIT_ON_ALLOC / SHUFFLE_PAGE_ALLOCATOR（性能优先）"
+
 info "配置注入完成"
