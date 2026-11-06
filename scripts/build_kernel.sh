@@ -131,8 +131,10 @@ load_toolchain_env
 cd kernel_workspace/common
 
 
-export SOURCE_DATE_EPOCH=$(date +%s)
-export KBUILD_BUILD_TIMESTAMP="$(date -u)"
+SOURCE_DATE_EPOCH=$(date +%s)
+export SOURCE_DATE_EPOCH
+KBUILD_BUILD_TIMESTAMP="$(date -u)"
+export KBUILD_BUILD_TIMESTAMP
 export KBUILD_BUILD_USER="OnePlus"
 export KBUILD_BUILD_HOST="ubuntu-build"
 
