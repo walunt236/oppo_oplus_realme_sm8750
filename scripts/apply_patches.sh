@@ -230,7 +230,9 @@ if [[ "$SUSFS_ENABLE" == "true" ]]; then
     # 后果：susfs_zygote_sid 恒为 0 -> is_zygote() 恒假 -> 管理器的 ksu fd 装不上
     # -> 管理器显示"未安装"（但 su 走 execveat 钩子，正常可用）。
     RULES_FILE=./kernel/selinux/rules.c
-    if [ -f "$RULES_FILE" ] && ! grep -q "susfs_set_batch_sid" "$RULES_FILE"; then
+    if [ -f "$RULES_FILE" ] && \
+       grep -rqs "void susfs_set_batch_sid" ./kernel/selinux/selinux.c 2>/dev/null && \
+       ! grep -q "susfs_set_batch_sid" "$RULES_FILE"; then
       if ! grep -qs "susfs_set_batch_sid" ./kernel/selinux/selinux.h 2>/dev/null; then
         sed -i "1i extern void susfs_set_batch_sid(void);" "$RULES_FILE"
       fi
