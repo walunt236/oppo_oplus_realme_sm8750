@@ -369,8 +369,13 @@ if [[ "$DROIDSPACES_ENABLE" != "false" ]]; then
   apply_patch_file "droidspaces_patch/fix_oplus_bsp_midas.patch" /tmp/fix_midas.patch nonstrict "fix_oplus_bsp_midas 补丁"
   cp "$GITHUB_WORKSPACE/droidspaces_patch/ntsync_base.patch" /tmp/ntsync_base.patch
   if cp "$GITHUB_WORKSPACE/droidspaces_patch/ntsync_compat_android15-$KERNEL_VERSION.patch" /tmp/ntsync_compat.patch; then
-    ( cd ./common && patch -p1 -F 3 < /tmp/ntsync_base.patch ) || true
-    ( cd ./common && patch -p1 -F 3 < /tmp/ntsync_compat.patch ) || true
+    ( cd ./common && patch -p1 -F 3 < /tmp/ntsync_base.patch > /tmp/ntsync.log 2>&1 ) || true
+    ( cd ./common && patch -p1 -F 3 < /tmp/ntsync_compat.patch >> /tmp/ntsync.log 2>&1 ) || true
+    if [ -f ./common/drivers/misc/ntsync.c ]; then
+      info "ntsync 已就位（Wine/Proton 同步原语）"
+    else
+      warn "ntsync 补丁未生效（明细 /tmp/ntsync.log）"
+    fi
   else
     warn "ntsync compat 补丁拉取失败，跳过（仅 base 已应用）"
     ( cd ./common && patch -p1 -F 3 < /tmp/ntsync_base.patch ) || true
