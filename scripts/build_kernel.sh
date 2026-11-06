@@ -47,6 +47,15 @@ make_defconfig() {
     CC="ccache clang" LD="ld.lld" HOSTLD=ld.lld O=out headers_install \
     >/dev/null 2>&1 || die "headers_install 失败"
   [ -f out/usr/include/linux/unistd.h ] || die "out/usr/include 未生成，KSU preinit 将不可用"
+
+  # 性能项是否真的落到最终 .config（defconfig 里的 "# ... is not set" 可能被 select）
+  for _c in INIT_ON_ALLOC_DEFAULT_ON SHUFFLE_PAGE_ALLOCATOR; do
+    if grep -q "^CONFIG_$_c=y" out/.config; then
+      warn "$_c 仍为 y：性能优化未生效"
+    else
+      info "$_c 已关闭"
+    fi
+  done
 }
 
 make_defconfig
