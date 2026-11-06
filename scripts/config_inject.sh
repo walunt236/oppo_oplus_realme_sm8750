@@ -51,6 +51,30 @@ CONFIG_ZRAM_DEF_COMP="lz4"
 LZ4KDCFG
 fi
 
+# 性能模式：关闭热路径上的加固与计费（CFI/KASAN 因模块 ABI 限制必须保留）
+if [ "@@{PERF_MODE:-balanced}" = "aggressive" ]; then
+  cat >> "@@DCFG" << 'PERFMODE'
+# 性能模式：栈变量零初始化（-ftrivial-auto-var-init=zero，每函数开销）
+CONFIG_INIT_STACK_NONE=y
+# CONFIG_INIT_STACK_ALL_ZERO is not set
+# CONFIG_INIT_STACK_ALL_PATTERN is not set
+# usercopy 越界检查
+# CONFIG_HARDENED_USERCOPY is not set
+# slab 空闲链表加固（每次分配都有异或/随机化开销）
+# CONFIG_SLAB_FREELIST_HARDENED is not set
+# CONFIG_SLAB_FREELIST_RANDOM is not set
+# 任务 IO 计费（每次 read/write 更新计数）
+# CONFIG_TASK_IO_ACCOUNTING is not set
+# CONFIG_TASK_XACCT is not set
+# 中断时间计费
+# CONFIG_IRQ_TIME_ACCOUNTING is not set
+PERFMODE
+  info "性能模式已启用：关闭 栈零初始化 / usercopy 检查 / slab 加固 / IO 与中断计费"
+  warn "安全提示：以上加固关闭后，内核本地漏洞利用难度下降；CFI 与 KASAN 因模块 ABI 限制仍保留"
+else
+  info "标准模式：保留上游全部加固（栈零初始化 / usercopy / slab / 计费）"
+fi
+
 echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" >> "$DCFG"
 # 骁龙 6.6.14x 已从 kernel/sched/Makefile 移除 ext.o，开启该选项会导致
 # bpf_sched_ext_ops 未定义，这里强制关闭
