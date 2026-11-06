@@ -74,11 +74,15 @@ on:
         required: true
         type: boolean
         default: false
-      afdo_enable:
-        description: '启用 AutoFDO（需要 ~/.cache_patches/afdo/kernel.afdo）'
+      afdo_mode:
+        description: 'AutoFDO 模式：off=关闭 / use=使用已有采样 / generate=生成可采样内核'
         required: true
-        type: boolean
-        default: false
+        type: choice
+        default: 'off'
+        options:
+          - 'off'
+          - 'use'
+          - 'generate'
       kernel_suffix:
         description: '内核后缀'
         required: false
@@ -127,7 +131,9 @@ jobs:
       DIAGNOSIS: ${{ inputs.diagnosis }}
       O3_SELECTIVE: ${{ inputs.o3_selective }}
       CLEAN_BUILD: ${{ inputs.clean_build }}
-      AFDO_ENABLE: ${{ inputs.afdo_enable }}
+      AFDO_MODE: ${{ inputs.afdo_mode }}
+      AFDO_ENABLE: ${{ inputs.afdo_mode != 'off' }}
+      AFDO_GENERATE: ${{ inputs.afdo_mode == 'generate' }}
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: 同步仓库代码
@@ -171,25 +177,30 @@ jobs:
         run: |
           AFDO_DIR="$HOME/.cache_patches/afdo"
           mkdir -p "$AFDO_DIR"
-          if [ "$AFDO_ENABLE" != "true" ]; then
-            if [ -s "$AFDO_DIR/kernel.afdo" ]; then
-              echo "[INFO] 检测到采样文件，但 afdo_enable=false，本次跳过 AutoFDO" | tee -a "$LOG_FILE"
-            else
-              echo "[INFO] AutoFDO 未启用，本次跳过" | tee -a "$LOG_FILE"
-            fi
-            echo "AFDO_PROFILE=" >> "$GITHUB_ENV"
-            exit 0
-          fi
-          if [ ! -s "$AFDO_DIR/kernel.afdo" ]; then
-            echo "[ERROR] afdo_enable=true 但缺少采样文件：$AFDO_DIR/kernel.afdo" | tee -a "$LOG_FILE"
-            exit 1
-          fi
-
-          AFDO_HASH=$(md5sum "$AFDO_DIR/kernel.afdo" | cut -c1-8)
-          AFDO_LINK="$AFDO_DIR/kernel-$AFDO_HASH.afdo"
-          ln -sf kernel.afdo "$AFDO_LINK"
-          echo "AFDO_PROFILE=$AFDO_LINK" >> "$GITHUB_ENV"
-          echo "[INFO] AutoFDO profile 就绪: $AFDO_LINK (hash=$AFDO_HASH)" | tee -a "$LOG_FILE"
+          MODE="${AFDO_MODE:-off}"
+          case "$MODE" in
+            use)
+              if [ ! -s "$AFDO_DIR/kernel.afdo" ]; then
+                echo "[ERROR] afdo_mode=use 但缺少采样文件：$AFDO_DIR/kernel.afdo" | tee -a "$LOG_FILE"
+                exit 1
+              fi
+              AFDO_HASH=$(md5sum "$AFDO_DIR/kernel.afdo" | cut -c1-8)
+              AFDO_LINK="$AFDO_DIR/kernel-$AFDO_HASH.afdo"
+              ln -sf kernel.afdo "$AFDO_LINK"
+              echo "AFDO_PROFILE=$AFDO_LINK" >> "$GITHUB_ENV"
+              echo "[INFO] AutoFDO 使用已有采样: $AFDO_LINK (hash=$AFDO_HASH)" | tee -a "$LOG_FILE"
+              ;;
+            generate)
+              echo "AFDO_PROFILE=" >> "$GITHUB_ENV"
+              echo "[INFO] AutoFDO 生成模式：本次内核带 -fdebug-info-for-profiling，用于采集" | tee -a "$LOG_FILE"
+              echo "[INFO] 设备采样: simpleperf record -a -b -e cycles -f 1000 -o /sdcard/perf.data --duration 300" | tee -a "$LOG_FILE"
+              echo "[INFO] 采完把 perf.data 放到编译机，执行 scripts/afdo_collect.sh perf.data" | tee -a "$LOG_FILE"
+              ;;
+            *)
+              echo "AFDO_PROFILE=" >> "$GITHUB_ENV"
+              echo "[INFO] AutoFDO 未启用" | tee -a "$LOG_FILE"
+              ;;
+          esac
 
       - name: 编译内核
         if: ${{ !inputs.diagnosis }}
