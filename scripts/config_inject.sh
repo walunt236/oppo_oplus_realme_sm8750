@@ -162,7 +162,7 @@ if [ ! -f "$TARGET_MAIN" ]; then
   exit 1
 fi
 
-sed -i '/setup_arch(&command_line);/a \    strlcat(boot_command_line, " schedstats=disable panic=30 page_alloc.shuffle=1 cryptomgr.notests rcutree.blimit=1024 workqueue.power_efficient=1 skew_tick=0 random.trust_cpu=on kfence.sample_interval=0 loglevel=3 transparent_hugepage=madvise", sizeof(boot_command_line));' "$TARGET_MAIN"
+sed -i '/setup_arch(&command_line);/a \    strlcat(boot_command_line, " schedstats=disable panic=30 page_alloc.shuffle=0 cryptomgr.notests rcutree.blimit=1024 workqueue.power_efficient=1 skew_tick=0 random.trust_cpu=on kfence.sample_interval=0 loglevel=3 transparent_hugepage=madvise kasan=off init_on_alloc=0", sizeof(boot_command_line));' "$TARGET_MAIN"
 
 if grep -q "strlcat.*boot_command_line" "$TARGET_MAIN"; then
   info "cmdline 注入成功"
@@ -280,19 +280,7 @@ echo "# CONFIG_SHUFFLE_PAGE_ALLOCATOR is not set" >> "$DCFG"
 
 info "已关闭 INIT_ON_ALLOC / SHUFFLE_PAGE_ALLOCATOR（性能优先）"
 
-# 运行时检测开销也通过内置 cmdline 关掉（CONFIG_CMDLINE_EXTEND=y，会追加到 bootloader 参数后）：
-#   kasan=off                : 关闭 KASAN(HW tags) 检查，符号与 ABI 全部保留，模块照常加载
-#   kfence.sample_interval=0 : 关闭 KFENCE 采样
-#   init_on_alloc=0 / page_alloc.shuffle=0 : 与上面的 defconfig 设置互为保险
-if grep -q '^CONFIG_CMDLINE="' "$DCFG"; then
-  sed -i 's|^CONFIG_CMDLINE="\(.*\)"$|CONFIG_CMDLINE="\1 kasan=off kfence.sample_interval=0 init_on_alloc=0 page_alloc.shuffle=0"$|' "$DCFG"
-  if grep -q 'kasan=off' "$DCFG"; then
-    info "启动参数已追加: kasan=off / kfence.sample_interval=0 / init_on_alloc=0 / page_alloc.shuffle=0"
-  else
-    warn "CMDLINE 追加失败（锚点未命中）"
-  fi
-else
-  warn "gki_defconfig 中没有 CONFIG_CMDLINE，跳过启动参数注入"
+g 中没有 CONFIG_CMDLINE，跳过启动参数注入"
 fi
 
 info "配置注入完成"
