@@ -76,15 +76,15 @@ elif [[ "$KSU_TYPE" == "ksunext" ]]; then
     sed -i "s/KSU_VERSION_TAG_FALLBACK := v0.0.1/KSU_VERSION_TAG_FALLBACK := $KSU_GIT_TAG/g" kernel/Kbuild
     grep -q "KSU_VERSION_TAG_FALLBACK := $KSU_GIT_TAG" kernel/Kbuild || warn "KSU_VERSION_TAG_FALLBACK 锚点未命中（上游 Kbuild 已变动）"
   fi
-  cd ../common
-  cp "$GITHUB_WORKSPACE/other_patch/apk_sign.patch" apk_sign.patch
-  patch -p1 -N -F 3 < apk_sign.patch > /tmp/apk_sign.log 2>&1 || true
-  if grep -q 'pershoot Manager' drivers/kernelsu/manager/apk_sign.c 2>/dev/null; then
+  # drivers/kernelsu 是指向 KernelSU-Next/kernel 的符号链接，patch 不会跟随，
+  # 所以进到链接目录内部用 -p3 应用（剥掉 a/drivers/kernelsu/ 三段）。
+  cd ../common/drivers/kernelsu
+  patch -p3 -N -F 3 < "$GITHUB_WORKSPACE/other_patch/apk_sign.patch" > /tmp/apk_sign.log 2>&1 || true
+  if grep -q 'pershoot Manager' manager/apk_sign.c 2>/dev/null; then
     info "多管理器签名支持已生效（pershoot / Wild_KSU）"
   else
     warn "apk_sign 补丁未生效（明细 /tmp/apk_sign.log）"
   fi
-  rm -f apk_sign.patch
 elif [[ "$KSU_TYPE" == "ksu" ]]; then
   info "配置原版 KernelSU..."
   sync_repo "https://github.com/tiann/KernelSU.git" KernelSU main
