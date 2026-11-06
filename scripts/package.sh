@@ -154,6 +154,13 @@ if mkdir -p "$TARGET_DIR" 2>/dev/null; then
     info "旧包已备份: $AK3_NAME.prev"
   fi
   cp "../$AK3_NAME" "$TARGET_DIR/" && info "已保存至: $TARGET_DIR/$AK3_NAME"
+  # 历史包：按 run 号留档，保留最近 5 个，便于回滚到任意一次可用构建
+  HIST_DIR="$TARGET_DIR/history"
+  if mkdir -p "$HIST_DIR" 2>/dev/null; then
+    HIST_NAME="${AK3_NAME%.zip}-run${GITHUB_RUN_NUMBER:-0}.zip"
+    cp -f "../$AK3_NAME" "$HIST_DIR/$HIST_NAME" && info "历史包: history/$HIST_NAME"
+    ls -1t "$HIST_DIR"/*.zip 2>/dev/null | tail -n +6 | xargs -r rm -f
+  fi
 else
   warn "无法写入 $TARGET_DIR，ZIP 保留在工作区"
 fi
