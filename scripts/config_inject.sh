@@ -64,8 +64,9 @@ echo "CONFIG_SCHED_CLUSTER=y" >> "$DCFG"
 sed -i '/^CONFIG_HEADERS_INSTALL/d' "$DCFG"
 echo "CONFIG_HEADERS_INSTALL=y" >> "$DCFG"
 # KSU preinit 需要 out/usr/include（Kbuild 用 wildcard 检测），必须保留
-if [ "${AFDO_ENABLE:-false}" = "true" ] && [ -s "$HOME/.cache_patches/afdo/kernel.afdo" ]; then
+if [ "${AFDO_ENABLE:-false}" = "true" ]; then
   echo "CONFIG_AUTOFDO_CLANG=y" >> "$DCFG"
+  info "AutoFDO 构建已启用（CONFIG_AUTOFDO_CLANG=y）"
 else
   info "AutoFDO 未启用，跳过 CONFIG_AUTOFDO_CLANG"
 fi
