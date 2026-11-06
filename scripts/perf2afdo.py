@@ -95,7 +95,7 @@ def main():
                 runtime_base = addr
         elif t == 9:  # PERF_RECORD_SAMPLE
             p = off + 8
-            u64(p); p += 8
+            sample_ip = u64(p); p += 8
             if sample_type & 0x2: p += 8      # TID
             if sample_type & 0x4: p += 8      # TIME
             if sample_type & 0x40: p += 8     # ID
@@ -116,6 +116,10 @@ def main():
                 if leaf and runtime_base and runtime_base <= leaf < runtime_base + KERN_SPAN:
                     n_kern += 1
                     leaf_ips[leaf - runtime_base + stext_link] += 1
+            elif sample_ip and runtime_base and runtime_base <= sample_ip < runtime_base + KERN_SPAN:
+                # 纯 IP 采样（无 --call-graph）：直接用样本 IP 作为叶子
+                n_kern += 1
+                leaf_ips[sample_ip - runtime_base + stext_link] += 1
         off += sz
 
     if not runtime_base:
