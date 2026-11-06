@@ -224,6 +224,25 @@ if [[ "$SUSFS_ENABLE" == "true" ]]; then
     else
       warn "susfs-ksu 集成补丁未生效（明细 /tmp/susfs_ksu.log）"
     fi
+
+    # 上游补丁按旧版 reset_avc_cache(u32) 写的上下文，在 main 上该 hunk 必然 reject，
+    # 结果 apply_kernelsu_rules() 里缺少 susfs_set_batch_sid() 调用。
+    # 后果：susfs_zygote_sid 恒为 0 -> is_zygote() 恒假 -> 管理器的 ksu fd 装不上
+    # -> 管理器显示"未安装"（但 su 走 execveat 钩子，正常可用）。
+    RULES_FILE=./kernel/selinux/rules.c
+    if [ -f "$RULES_FILE" ] && ! grep -q "susfs_set_batch_sid" "$RULES_FILE"; then
+      if ! grep -qs "susfs_set_batch_sid" ./kernel/selinux/selinux.h 2>/dev/null; then
+        sed -i "1i extern void susfs_set_batch_sid(void);" "$RULES_FILE"
+      fi
+      sed -i "0,/reset_avc_cache(pol->latest_granting);/s//&\n    susfs_set_batch_sid();/" "$RULES_FILE"
+      if grep -q "susfs_set_batch_sid" "$RULES_FILE"; then
+        info "已补上 susfs_set_batch_sid()：SID 初始化恢复（修复管理器未识别）"
+      else
+        warn "susfs_set_batch_sid() 补写失败，管理器可能仍显示未安装"
+      fi
+    else
+      info "susfs_set_batch_sid() 已存在，无需补写"
+    fi
   fi
 fi
 
