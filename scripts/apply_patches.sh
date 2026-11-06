@@ -108,7 +108,8 @@ WILD_DIR="$HOME/.cache_patches/wild_patches"
 mkdir -p "$HOME/.cache_patches"
 
 if [[ "$SUSFS_ENABLE" == "true" && "$KSU_TYPE" != "none" ]]; then
-  sync_repo "https://github.com/ShirkNeko/susfs4ksu.git" "$SUSFS_CACHE_DIR" "gki-android15-6.6" || true &
+  SUSFS_BRANCH="gki-${QCOM_SERIES:-android15-6.6}"
+sync_repo "https://github.com/ShirkNeko/susfs4ksu.git" "$SUSFS_CACHE_DIR" "$SUSFS_BRANCH" || true &
 fi
 sync_repo "https://github.com/mrcxlinux/kernel_patches.git" "$ZRAM_CACHE_DIR" || true &
 if [[ "$LZ4KD_ENABLE" == "true" ]]; then
@@ -137,7 +138,7 @@ if [[ "$SUSFS_ENABLE" == "true" ]]; then
 
     cp "$GITHUB_WORKSPACE/other_patch/69_hide_stuff.patch" ./common/69_hide_stuff.patch
 
-    cp ./susfs4ksu/kernel_patches/50_add_susfs_in_gki-android15-6.6.patch ./common/
+    cp ./susfs4ksu/kernel_patches/50_add_susfs_in_${SUSFS_BRANCH}.patch ./common/
     cp ./susfs4ksu/kernel_patches/fs/* ./common/fs/
     cp ./susfs4ksu/kernel_patches/include/linux/* ./common/include/linux/
 
@@ -145,7 +146,7 @@ if [[ "$SUSFS_ENABLE" == "true" ]]; then
 
     sed -i -e '/int ret = 0, copied = 0;/a \    unsigned int nr_subpages = __PAGE_SIZE / PAGE_SIZE;' -e '/int ret = 0, copied = 0;/a \    pagemap_entry_t *res = NULL;' ./fs/proc/task_mmu.c || true
 
-    patch -p1 < 50_add_susfs_in_gki-android15-6.6.patch || {
+    patch -p1 < 50_add_susfs_in_${SUSFS_BRANCH}.patch || {
       sed -i '/^    unsigned int nr_subpages = __PAGE_SIZE \/ PAGE_SIZE;$/d; /^    pagemap_entry_t \*res = NULL;$/d' ./fs/proc/task_mmu.c || true
       error "SUSFS 核心补丁应用失败"
       exit 1
@@ -278,21 +279,8 @@ TOTAL_REJ=0
 TOTAL_REJ_FILES=0
 count_rejs "基础补丁"
 
-mkdir -p "$HOME/.cache_patches/aosp"
-for hash in 47f80469849a 5fddd8e6a0a7 0a9eef42768c 71bd6942e33f ef0123e95425 7abe312b37cf 6a42fccfc2bc d43ee181a478 5c8ecdcfbfb0 c5d6863c9aba 9eecad532ad3; do
-  if [ ! -s "$HOME/.cache_patches/aosp/$hash.patch" ]; then
-    curl -fsSL --retry 3 --retry-delay 5 --connect-timeout 10 --max-time 30 \
-      -o "$HOME/.cache_patches/aosp/$hash.patch" "https://github.com/aosp-mirror/kernel_common/commit/$hash.patch" 2>/dev/null || rm -f "$HOME/.cache_patches/aosp/$hash.patch"
-  fi
-done
-for hash in 47f80469849a 5fddd8e6a0a7 0a9eef42768c 71bd6942e33f ef0123e95425 7abe312b37cf 6a42fccfc2bc d43ee181a478 5c8ecdcfbfb0 c5d6863c9aba 9eecad532ad3; do
-  if [ -s "$HOME/.cache_patches/aosp/$hash.patch" ]; then
-    patch -p1 --forward -F 3 < "$HOME/.cache_patches/aosp/$hash.patch" 2>/dev/null || warn "aosp/$hash.patch 应用失败，继续..."
-  else
-    warn "aosp/$hash.patch 下载失败（commit 可能不存在），跳过"
-  fi
-done
-count_rejs "AOSP"
+# AOSP 直连补丁已移除：11 个 commit 的改动已 100% 包含在 6.6.143 上游，
+# 且 aosp-mirror 仓库已停止更新（最后推送 2025-11），保留只会产生无效 reject。
 
 # palazik 补丁已停用（try_to_steal_block 与 6.6.143 的 fallback 流程不兼容，收益小）
 
