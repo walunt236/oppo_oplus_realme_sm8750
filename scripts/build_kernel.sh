@@ -41,12 +41,9 @@ fi
 
 make_defconfig() {
   make -j${BUILD_JOBS} LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" LD="ld.lld" HOSTLD=ld.lld O=out gki_defconfig
-  # CONFIG_HEADERS_INSTALL=n 时 out/usr/include 不会生成；若上次残留了它，
-  # KernelSU 的 Kbuild 会误判 preinit 可用，导致链接期 undefined symbol。
-  # 这里显式清掉，让状态不依赖 out/ 的历史残留。
-  if ! grep -q '^CONFIG_HEADERS_INSTALL=y' out/.config; then
-    rm -rf out/usr/include
-  fi
+  # KSU 的 preinit 依赖 out/usr/include/linux/unistd.h（Kbuild 用 wildcard 检测），
+  # 这里不再删除；下面会显式跑一次 headers_install 保证它存在。
+  :
 }
 
 make_defconfig
@@ -150,11 +147,8 @@ KCFLAGS_EXTRA+=" -mllvm -enable-loopinterchange=true -mllvm -enable-ipra -mllvm 
 KCFLAGS_EXTRA+=" -mllvm -enable-aarch64-lsr-cost-opt -mllvm -enable-aarch64-or-like-select -mllvm -vectorizer-min-trip-count=2"
 KCFLAGS_EXTRA+=" -mllvm -unroll-threshold=300 -mllvm -enable-loop-distribute"
 
-# KernelSU 当前 Kbuild 未编译 preinit/，但 SUSFS 补丁的 exec.c 钩子引用其符号；
-# 用 SUSFS 官方开关 KSU_NO_PREINIT 关掉这组钩子，避免链接期 undefined symbol。
-if [[ "${SUSFS_ENABLE:-false}" == "true" && "${KSU_TYPE:-none}" != "none" ]]; then
-  KCFLAGS_EXTRA+=" -DKSU_NO_PREINIT"
-fi
+# KSU_NO_PREINIT 兜底已移除：headers_install 后 preinit 会被编译，
+# 其符号真实存在，SUSFS 的 exec.c 钩子可以直接链接。
 
 info "核心编译器版本检查："
 clang --version | head -n 1
