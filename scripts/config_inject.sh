@@ -66,9 +66,10 @@ CONFIG_INIT_STACK_NONE=y
 # slab 空闲链表加固（每次分配都有异或/随机化开销）
 # CONFIG_SLAB_FREELIST_HARDENED is not set
 # CONFIG_SLAB_FREELIST_RANDOM is not set
-# 任务 IO 计费（每次 read/write 更新计数）
-# CONFIG_TASK_IO_ACCOUNTING is not set
-# CONFIG_TASK_XACCT is not set
+# 注意：CONFIG_TASK_IO_ACCOUNTING / CONFIG_TASK_XACCT 绝不能关闭！
+# 二者控制 task_struct 里的 ioac 与 acct_rss_mem1/acct_vm_mem1/acct_timexpd 字段
+# （include/linux/sched.h），关闭会让 task_struct 缩小 24 字节，
+# 导致厂商预编译模块按旧偏移读 task 字段 -> 启动期死锁（实测卡开机 logo）。
 # 中断时间计费
 # CONFIG_IRQ_TIME_ACCOUNTING is not set
 PERFMODE
