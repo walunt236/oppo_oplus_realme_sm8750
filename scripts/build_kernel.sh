@@ -110,6 +110,22 @@ assert_config CONFIG_TCP_CONG_BBR3 "BBRv3"
 assert_config CONFIG_PER_VMA_LOCK_STATS "per-VMA lock 统计"
 assert_config CONFIG_IOMMU_DEFAULT_DMA_STRICT "IOMMU 严格模式"
 
+# 性能模式校验：配置必须真正落到 .config，不能只写在 defconfig 里
+if [ "${PERF_MODE:-balanced}" = "aggressive" ]; then
+  if grep -q '^CONFIG_INIT_STACK_ALL_ZERO=y' out/.config; then
+    die "性能模式：栈零初始化未关闭（INIT_STACK_ALL_ZERO 仍为 y）"
+  fi
+  grep -q '^CONFIG_INIT_STACK_NONE=y' out/.config || die "性能模式：INIT_STACK_NONE 未选中"
+  if grep -q '^CONFIG_HARDENED_USERCOPY=y' out/.config; then die "性能模式：HARDENED_USERCOPY 仍开启"; fi
+  if grep -q '^CONFIG_SLAB_FREELIST_HARDENED=y' out/.config; then die "性能模式：SLAB_FREELIST_HARDENED 仍开启"; fi
+  if grep -q '^CONFIG_SLAB_FREELIST_RANDOM=y' out/.config; then die "性能模式：SLAB_FREELIST_RANDOM 仍开启"; fi
+  if grep -q '^CONFIG_TASK_IO_ACCOUNTING=y' out/.config; then die "性能模式：TASK_IO_ACCOUNTING 仍开启"; fi
+  if grep -q '^CONFIG_IRQ_TIME_ACCOUNTING=y' out/.config; then die "性能模式：IRQ_TIME_ACCOUNTING 仍开启"; fi
+  info "性能模式校验通过：栈零初始化 / usercopy / slab 加固 / IO 与中断计费 均已关闭"
+else
+  info "标准模式：加固项保持上游默认（栈零初始化等）"
+fi
+
 if grep -q '^CONFIG_LLVM_POLLY=y' out/.config; then
   info "LLVM POLLY 配置生效"
 else
