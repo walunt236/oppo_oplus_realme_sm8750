@@ -461,6 +461,11 @@ info "启用 ADIOS I/O 调度器..."
 cd "$GITHUB_WORKSPACE/kernel_workspace"
 apply_patch_file "other_patch/adios/adios_block_only.patch" /tmp/adios.patch strict "ADIOS 补丁"
 
+# KVM NVHE：AutoFDO 生成的 .rel.llvm.* 元数据节会被 gen-hyprel 判为致命错误
+if [ -f ./common/arch/arm64/tools/gen-hyprel.c ] && ! grep -q 'strncmp(section_name(shdr), "\.rel\.llvm\."' ./common/arch/arm64/tools/gen-hyprel.c; then
+  apply_patch_file "other_patch/nvhe_skip_cgprofile_rel.patch" /tmp/nvhe_cgprof.patch strict "KVM NVHE call-graph-profile 兼容"
+fi
+
 # Re-Kernel
 if [[ "$REKERNEL_ENABLE" == "true" ]]; then
   info "启用 Re-Kernel 支持..."
