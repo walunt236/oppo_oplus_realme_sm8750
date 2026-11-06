@@ -193,14 +193,43 @@ if [[ "$SUSFS_ENABLE" == "true" ]]; then
     info "为原版 KernelSU 添加补丁..."
     cp ./susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./KernelSU/ || warn "susfs-ksu 补丁文件缺失，跳过补丁应用"
     cd ./KernelSU
+    # SUSFS 补丁由第三方维护，可能落后于 KernelSU main（例如 2026-11-06 的 #3969 重构）。
+    # 自适应回退：从 main 往前找第一个能让补丁干净应用的提交，避免硬钉版本。
+    glr -C . fetch -q --depth=12 origin main 2>/dev/null || true
+    SUSFS_FIT=-1
+    for back in 0 1 2 3 4 5 6 7 8 9 10; do
+      if [ "$back" -gt 0 ]; then
+        git checkout -q "HEAD~1" 2>/dev/null || break
+      fi
+      if patch -p1 --dry-run --forward < 10_enable_susfs_for_ksu.patch >/dev/null 2>&1; then
+        SUSFS_FIT=$back
+        break
+      fi
+    done
+    if [ "$SUSFS_FIT" -lt 0 ]; then
+      error "在最近 11 个 KernelSU 提交中都找不到能应用 SUSFS 补丁的版本，中止构建"
+      exit 1
+    fi
+    if [ "$SUSFS_FIT" -gt 0 ]; then
+      NEW_SHA=$(git rev-parse HEAD)
+      NEW_COMMITS=$(ksu_commit_count tiann/KernelSU "$NEW_SHA")
+      NEW_COMMITS=${NEW_COMMITS:-0}
+      if [ "$NEW_COMMITS" -gt 0 ]; then
+        KSU_VERSION=$((NEW_COMMITS + 30000))
+        if grep -q '^KSUVER=' "$GITHUB_ENV" 2>/dev/null; then
+          sed -i "s/^KSUVER=.*/KSUVER=$KSU_VERSION/" "$GITHUB_ENV"
+        else
+          echo "KSUVER=$KSU_VERSION" >> "$GITHUB_ENV"
+        fi
+        warn "KernelSU main 回退 ${SUSFS_FIT} 个提交以兼容 SUSFS 补丁（版本 $KSU_VERSION / ${NEW_SHA:0:8}）"
+      else
+        warn "KernelSU main 回退 ${SUSFS_FIT} 个提交以兼容 SUSFS 补丁（版本号未更新）"
+      fi
+    fi
     patch -p1 < 10_enable_susfs_for_ksu.patch > /tmp/susfs_ksu.log 2>&1 || true
-    # 该补丁是针对上游 main 写的；在 release tag(v3.3.1) 上会有 hunk 失败。
-    # 只要有 reject 就必须整体回滚：半应用会让源码引用不存在的符号，编译直接失败。
     if find . -name "*.rej" | grep -q .; then
       REJ_N=$(find . -name "*.rej" | wc -l)
-      # 不能回滚：内核侧 fs/susfs.c 的 CONFIG_KSU_SUSFS_* 由本补丁的 Kconfig 提供，
-      # 回滚会让内核侧 SUSFS 条件编译失效并编译失败。半残状态必须显式中止。
-      error "susfs-ksu 集成补丁与当前 KernelSU 版本不兼容（${REJ_N} 个 reject），中止构建"
+      error "susfs-ksu 集成补丁应用后仍有 ${REJ_N} 个 reject，中止构建"
       find . -name "*.rej" | head -6
       exit 1
     else
