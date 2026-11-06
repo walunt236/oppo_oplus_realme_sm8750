@@ -93,7 +93,9 @@ elif [[ "$KSU_TYPE" == "ksu" ]]; then
   # 默认对齐官方 release：内核 KSU 版本号要与官方 APK 一致，
   # 且内核编译期写死的管理器签名哈希(c371061b...)是 release 签名。
   # 开发版(main)APK 由 CI 用临时密钥签名，内核永远认不出。
-  KSU_CHANNEL="${KSU_CHANNEL:-release}"
+  # 默认 main：SUSFS 集成补丁是针对 main 写的，release tag(v3.3.1) 上会大面积 reject。
+  # 若上游 SUSFS 补丁支持了 release 版本，可用 KSU_CHANNEL=release 切换。
+  KSU_CHANNEL="${KSU_CHANNEL:-main}"
   KSU_REL_TAG=""
   if [ "$KSU_CHANNEL" = "release" ]; then
     KSU_REL_TAG=$(curl -sL --retry 3 --retry-delay 5 --retry-all-errors --max-time 20       "https://api.github.com/repos/tiann/KernelSU/releases/latest" 2>/dev/null       | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1 || true)
@@ -196,11 +198,11 @@ if [[ "$SUSFS_ENABLE" == "true" ]]; then
     # 只要有 reject 就必须整体回滚：半应用会让源码引用不存在的符号，编译直接失败。
     if find . -name "*.rej" | grep -q .; then
       REJ_N=$(find . -name "*.rej" | wc -l)
-      warn "susfs-ksu 集成补丁与当前 KernelSU 版本不兼容（${REJ_N} 个 reject），已整体回滚；内核侧 SUSFS 不受影响"
-      git checkout -q -- . 2>/dev/null
-      find . -name "*.orig" -delete 2>/dev/null
-      find . -name "*.rej" -delete 2>/dev/null
-      info "KernelSU 源码已恢复到干净状态"
+      # 不能回滚：内核侧 fs/susfs.c 的 CONFIG_KSU_SUSFS_* 由本补丁的 Kconfig 提供，
+      # 回滚会让内核侧 SUSFS 条件编译失效并编译失败。半残状态必须显式中止。
+      error "susfs-ksu 集成补丁与当前 KernelSU 版本不兼容（${REJ_N} 个 reject），中止构建"
+      find . -name "*.rej" | head -6
+      exit 1
     else
       info "SUSFS ↔ KernelSU 集成已生效"
     fi
