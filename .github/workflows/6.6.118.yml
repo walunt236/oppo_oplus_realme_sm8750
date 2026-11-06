@@ -79,11 +79,6 @@ on:
         required: true
         type: boolean
         default: false
-      bore_enable:
-        description: 'BORE 调度器 [WIP 不可用：6.6.143 适配未完成，开启会编译失败]'
-        required: true
-        type: boolean
-        default: false
       kernel_suffix:
         description: '内核后缀'
         required: false
@@ -167,9 +162,6 @@ jobs:
       - name: 注入配置
         run: bash "$GITHUB_WORKSPACE/scripts/config_inject.sh"
 
-      - name: 应用 BORE 调度器（可选）
-        if: inputs.bore_enable
-        run: bash "$GITHUB_WORKSPACE/scripts/apply_bore.sh"
 
       - name: 准备 AutoFDO profile
         run: |
