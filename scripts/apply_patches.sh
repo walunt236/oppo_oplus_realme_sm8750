@@ -192,10 +192,17 @@ if [[ "$SUSFS_ENABLE" == "true" ]]; then
     cp ./susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./KernelSU/ || warn "susfs-ksu 补丁文件缺失，跳过补丁应用"
     cd ./KernelSU
     patch -p1 < 10_enable_susfs_for_ksu.patch > /tmp/susfs_ksu.log 2>&1 || true
-    if grep -rqs 'susfs' kernel/Kconfig 2>/dev/null; then
-      info "SUSFS ↔ KernelSU 集成已生效"
+    # 该补丁是针对上游 main 写的；在 release tag(v3.3.1) 上会有 hunk 失败。
+    # 只要有 reject 就必须整体回滚：半应用会让源码引用不存在的符号，编译直接失败。
+    if find . -name "*.rej" | grep -q .; then
+      REJ_N=$(find . -name "*.rej" | wc -l)
+      warn "susfs-ksu 集成补丁与当前 KernelSU 版本不兼容（${REJ_N} 个 reject），已整体回滚；内核侧 SUSFS 不受影响"
+      git checkout -q -- . 2>/dev/null
+      find . -name "*.orig" -delete 2>/dev/null
+      find . -name "*.rej" -delete 2>/dev/null
+      info "KernelSU 源码已恢复到干净状态"
     else
-      warn "susfs-ksu 集成补丁未生效（明细 /tmp/susfs_ksu.log）"
+      info "SUSFS ↔ KernelSU 集成已生效"
     fi
   fi
 fi
