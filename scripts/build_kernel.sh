@@ -321,6 +321,14 @@ if [ "$AFDO_GEN_ONLY" -eq 1 ]; then
 fi
 
 info "内核镜像编译完成"
+# zram 调优版本标记校验：缺失说明增量构建复用了旧目标文件
+if [ -n "${ZRAM_TUNE_REV:-}" ] && [ -f out/vmlinux ]; then
+  if grep -aq "$ZRAM_TUNE_REV" out/vmlinux; then
+    info "zram 调优标记校验通过（$ZRAM_TUNE_REV）"
+  else
+    die "zram 调优未编入内核（$ZRAM_TUNE_REV 缺失，疑似增量构建复用了旧目标文件）"
+  fi
+fi
 if nm out/vmlinux 2>/dev/null | grep -q "_lz4_decompress_asm"; then
   info "_lz4_decompress_asm 符号校验通过"
 else
