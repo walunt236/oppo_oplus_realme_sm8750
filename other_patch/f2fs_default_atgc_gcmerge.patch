@@ -1,0 +1,13 @@
+--- a/fs/f2fs/super.c
++++ b/fs/f2fs/super.c
+@@ -4630,6 +4630,10 @@
+ 						sizeof(raw_super->uuid));
+ 
+ 	default_options(sbi, false);
++
++	/* 默认启用 ATGC 与 GC_MERGE，不依赖 ROM 的 fstab 挂载参数 */
++	set_opt(sbi, ATGC);
++	set_opt(sbi, GC_MERGE);
+ 	/* parse mount options */
+ 	options = kstrdup((const char *)data, GFP_KERNEL);
+ 	if (data && !options) {
