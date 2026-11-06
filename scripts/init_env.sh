@@ -119,6 +119,7 @@ else
   QCOM_LATEST_TAG=${QCOM_LATEST_TAG:-$QCOM_BASE_TAG}
   info "骁龙上游: 基线 $QCOM_BASE_TAG -> 目标 $QCOM_LATEST_TAG"
   echo "QCOM_LATEST_TAG=$QCOM_LATEST_TAG" >> "$GITHUB_ENV"
+echo "QCOM_SERIES=$QCOM_SERIES" >> "$GITHUB_ENV"
 
   if [[ "$QCOM_LATEST_TAG" == "$QCOM_BASE_TAG" ]]; then
     info "骁龙上游无新版本，跳过合并"
