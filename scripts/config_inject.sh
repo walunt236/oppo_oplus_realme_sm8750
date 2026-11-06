@@ -54,36 +54,6 @@ CONFIG_ZRAM_DEF_COMP_LZ4=y
 CONFIG_ZRAM_DEF_COMP="lz4"
 ZRAMDEFCFG
 
-# 性能模式：分级注入（CFI/KASAN/SCS/PAC 因模块 ABI 限制必须保留）
-# 实测：INIT_STACK_ALL_ZERO 关闭会导致本机型启动挂起（厂商代码依赖栈零初始化），
-#       因此 aggressive 档不含它；需要验证时可单独选 stack_only。
-case "${PERF_MODE:-balanced}" in
-  aggressive)
-    cat >> "$DCFG" << 'PERFMODE'
-# usercopy 越界检查（每次 copy_to/from_user 一次范围校验）
-# CONFIG_HARDENED_USERCOPY is not set
-# slab 空闲链表加固（每次分配有异或/随机化开销）
-# CONFIG_SLAB_FREELIST_HARDENED is not set
-# CONFIG_SLAB_FREELIST_RANDOM is not set
-# 中断时间计费
-# CONFIG_IRQ_TIME_ACCOUNTING is not set
-PERFMODE
-    info "性能模式(aggressive)：关闭 usercopy 检查 / slab 加固 / 中断时间计费"
-    warn "安全提示：以上加固关闭后，内核本地漏洞利用难度下降；CFI/KASAN/SCS/PAC 仍保留"
-    ;;
-  stack_only)
-    cat >> "$DCFG" << 'PERFSTACK'
-# 实验档：仅关闭栈变量零初始化（-ftrivial-auto-var-init=zero）
-CONFIG_INIT_STACK_NONE=y
-# CONFIG_INIT_STACK_ALL_ZERO is not set
-# CONFIG_INIT_STACK_ALL_PATTERN is not set
-PERFSTACK
-    info "实验模式(stack_only)：仅关闭栈变量零初始化"
-    ;;
-  *)
-    info "标准模式：保留上游全部加固（栈零初始化 / usercopy / slab / 计费）"
-    ;;
-esac
 
 echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" >> "$DCFG"
 # 骁龙 6.6.14x 已从 kernel/sched/Makefile 移除 ext.o，开启该选项会导致
