@@ -44,12 +44,15 @@ CONFIG_ZSMALLOC=y
 CONFIG_CRYPTO_LZ4K=y
 CONFIG_CRYPTO_LZ4KD=y
 CONFIG_CRYPTO_842=y
-# zram 双重压缩：lz4 主算法 + zstd 冷数据重压缩
-# 冷数据：MULTI_COMP recompression 转 zstd
-CONFIG_ZRAM_DEF_COMP_LZ4=y
-CONFIG_ZRAM_DEF_COMP="lz4"
 LZ4KDCFG
 fi
+
+# zram 双重压缩：主算法 lz4（解压快，页错误延迟低）+ 冷数据由 zstd 重压缩（压缩率高）
+# 不能放进 LZ4KD 条件块：否则关闭 lz4kd 时会退回 Kconfig 默认的 lzo-rle
+cat >> "$DCFG" << 'ZRAMDEFCFG'
+CONFIG_ZRAM_DEF_COMP_LZ4=y
+CONFIG_ZRAM_DEF_COMP="lz4"
+ZRAMDEFCFG
 
 # 性能模式：关闭热路径上的加固与计费（CFI/KASAN 因模块 ABI 限制必须保留）
 if [ "${PERF_MODE:-balanced}" = "aggressive" ]; then
