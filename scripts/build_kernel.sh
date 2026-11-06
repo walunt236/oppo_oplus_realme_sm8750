@@ -110,23 +110,27 @@ assert_config CONFIG_TCP_CONG_BBR3 "BBRv3"
 assert_config CONFIG_PER_VMA_LOCK_STATS "per-VMA lock 统计"
 assert_config CONFIG_IOMMU_DEFAULT_DMA_STRICT "IOMMU 严格模式"
 
-# 性能模式校验：配置必须真正落到 .config，不能只写在 defconfig 里
-if [ "${PERF_MODE:-balanced}" = "aggressive" ]; then
-  if grep -q '^CONFIG_INIT_STACK_ALL_ZERO=y' out/.config; then
-    die "性能模式：栈零初始化未关闭（INIT_STACK_ALL_ZERO 仍为 y）"
-  fi
-  grep -q '^CONFIG_INIT_STACK_NONE=y' out/.config || die "性能模式：INIT_STACK_NONE 未选中"
-  if grep -q '^CONFIG_HARDENED_USERCOPY=y' out/.config; then die "性能模式：HARDENED_USERCOPY 仍开启"; fi
-  if grep -q '^CONFIG_SLAB_FREELIST_HARDENED=y' out/.config; then die "性能模式：SLAB_FREELIST_HARDENED 仍开启"; fi
-  if grep -q '^CONFIG_SLAB_FREELIST_RANDOM=y' out/.config; then die "性能模式：SLAB_FREELIST_RANDOM 仍开启"; fi
-  if grep -q '^CONFIG_IRQ_TIME_ACCOUNTING=y' out/.config; then die "性能模式：IRQ_TIME_ACCOUNTING 仍开启"; fi
-  # ABI 保护：这两个选项控制 task_struct 字段，关掉必然破坏厂商模块，任何模式都不许关
-  grep -q '^CONFIG_TASK_IO_ACCOUNTING=y' out/.config || die "ABI 保护：CONFIG_TASK_IO_ACCOUNTING 被关闭，会破坏 task_struct 布局"
-  grep -q '^CONFIG_TASK_XACCT=y' out/.config || die "ABI 保护：CONFIG_TASK_XACCT 被关闭，会破坏 task_struct 布局"
-  info "性能模式校验通过：栈零初始化 / usercopy / slab 加固 / 中断时间计费 均已关闭（IO 计费按 ABI 保留）"
-else
-  info "标准模式：加固项保持上游默认（栈零初始化等）"
-fi
+# 性能模式校验：配置必须真正落到 .config
+case "${PERF_MODE:-balanced}" in
+  aggressive)
+    for _s in HARDENED_USERCOPY SLAB_FREELIST_HARDENED SLAB_FREELIST_RANDOM IRQ_TIME_ACCOUNTING; do
+      if grep -q "^CONFIG_${_s}=y" out/.config; then die "性能模式：CONFIG_${_s} 仍开启"; fi
+    done
+    info "性能模式校验通过：usercopy / slab 加固 / 中断时间计费 已关闭"
+    ;;
+  stack_only)
+    if grep -q '^CONFIG_INIT_STACK_ALL_ZERO=y' out/.config; then die "stack_only：INIT_STACK_ALL_ZERO 未关闭"; fi
+    grep -q '^CONFIG_INIT_STACK_NONE=y' out/.config || die "stack_only：INIT_STACK_NONE 未选中"
+    info "stack_only 校验通过：栈零初始化已关闭"
+    ;;
+  *)
+    info "标准模式：保留上游全部加固"
+    ;;
+esac
+
+# ABI 保护：task_struct 字段相关选项任何模式都不许关
+grep -q '^CONFIG_TASK_IO_ACCOUNTING=y' out/.config || die "ABI 保护：CONFIG_TASK_IO_ACCOUNTING 被关闭，会破坏 task_struct 布局"
+grep -q '^CONFIG_TASK_XACCT=y' out/.config || die "ABI 保护：CONFIG_TASK_XACCT 被关闭，会破坏 task_struct 布局"
 
 if grep -q '^CONFIG_LLVM_POLLY=y' out/.config; then
   info "LLVM POLLY 配置生效"
