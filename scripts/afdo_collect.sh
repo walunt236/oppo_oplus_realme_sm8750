@@ -30,11 +30,11 @@ fi
 
 echo "[INFO] llvm-profgen: $("$PROFGEN" --version 2>/dev/null | head -1)"
 echo "[INFO] 采样文件: $PERF ($(du -h "$PERF" | cut -f1))"
-echo "[INFO] vmlinux:   $VMLINUX ($(du -h "$VMLINUX" | cut -f1))"
+echo "[INFO] vmlinux:   $VMLINUX ($(du -Lh "$VMLINUX" | cut -f1))"
 
 mkdir -p "$AFDO_DIR"
 OUT="$AFDO_DIR/kernel.afdo.new"
-"$PROFGEN" --binary="$VMLINUX" --perfdata="$PERF" > "$OUT"
+"$PROFGEN" --binary="$VMLINUX" --perfdata="$PERF" --output="$OUT"
 
 if [ ! -s "$OUT" ]; then
   echo "[ERROR] profile 生成失败（确认 perf.data 带分支栈 -b）"
