@@ -33,7 +33,7 @@ link_ksu_kernel() {
 }
 
 ksu_commit_count() {
-  curl -sI --retry 3 --retry-delay 5 "https://api.github.com/repos/$1/commits?sha=$2&per_page=1" | grep -i "link:" | sed -n 's/.*page=\([0-9]*\)>; rel="last".*/\1/p' || true
+  curl -sI --retry 3 --retry-delay 5 -H "Authorization: token ${GH_TOKEN:-}" "https://api.github.com/repos/$1/commits?sha=$2&per_page=1" | grep -i "link:" | sed -n 's/.*page=\([0-9]*\)>; rel="last".*/\1/p' || true
 }
 
 # KernelSU
