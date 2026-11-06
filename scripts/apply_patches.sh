@@ -90,7 +90,23 @@ elif [[ "$KSU_TYPE" == "ksu" ]]; then
   sync_repo "https://github.com/tiann/KernelSU.git" KernelSU main
   link_ksu_kernel KernelSU
   cd ./KernelSU
-  KSU_COMMITS=$(ksu_commit_count tiann/KernelSU main)
+  # 默认对齐官方 release：内核 KSU 版本号要与官方 APK 一致，
+  # 且内核编译期写死的管理器签名哈希(c371061b...)是 release 签名。
+  # 开发版(main)APK 由 CI 用临时密钥签名，内核永远认不出。
+  KSU_CHANNEL="${KSU_CHANNEL:-release}"
+  KSU_REL_TAG=""
+  if [ "$KSU_CHANNEL" = "release" ]; then
+    KSU_REL_TAG=$(curl -sL --retry 3 --retry-delay 5 --retry-all-errors --max-time 20       "https://api.github.com/repos/tiann/KernelSU/releases/latest" 2>/dev/null       | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1 || true)
+    if [ -n "${KSU_REL_TAG:-}" ] && \
+       git -c http.proxy= fetch -q --depth=1 origin "refs/tags/${KSU_REL_TAG}:refs/tags/${KSU_REL_TAG}" 2>/dev/null && \
+       git checkout -q "refs/tags/${KSU_REL_TAG}" 2>/dev/null; then
+      info "KernelSU 已对齐官方 release: ${KSU_REL_TAG}"
+    else
+      warn "KernelSU release tag 检出失败，回退 main（管理器需自编译同密钥版本）"
+      KSU_REL_TAG=""
+    fi
+  fi
+  KSU_COMMITS=$(ksu_commit_count tiann/KernelSU "${KSU_REL_TAG:-main}")
   KSU_COMMITS=${KSU_COMMITS:-0}
   if [[ "$KSU_COMMITS" == "0" ]]; then
     warn "KernelSU 提交数获取失败，版本号降级为基线"
