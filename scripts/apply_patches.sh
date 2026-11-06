@@ -90,22 +90,26 @@ elif [[ "$KSU_TYPE" == "ksu" ]]; then
   sync_repo "https://github.com/tiann/KernelSU.git" KernelSU main
   link_ksu_kernel KernelSU
   cd ./KernelSU
-  # 默认对齐官方 release：内核 KSU 版本号要与官方 APK 一致，
-  # 且内核编译期写死的管理器签名哈希(c371061b...)是 release 签名。
+  # 默认对齐官方 release：内核 KSU 版本号必须与官方 APK 一致，
+  # 且内核编译期写死的签名哈希(c371061b...)对应 release 密钥；
   # 开发版(main)APK 由 CI 用临时密钥签名，内核永远认不出。
-  # 默认 main：SUSFS 集成补丁是针对 main 写的，release tag(v3.3.1) 上会大面积 reject。
-  # 若上游 SUSFS 补丁支持了 release 版本，可用 KSU_CHANNEL=release 切换。
-  KSU_CHANNEL="${KSU_CHANNEL:-main}"
+  # SUSFS 补丁另需对齐到发布同期提交（见下方 SUSFS 同步段）。
+  KSU_CHANNEL="${KSU_CHANNEL:-release}"
   KSU_REL_TAG=""
+  KSU_TAG_DATE=""
   if [ "$KSU_CHANNEL" = "release" ]; then
-    KSU_REL_TAG=$(curl -sL --retry 3 --retry-delay 5 --retry-all-errors --max-time 20       "https://api.github.com/repos/tiann/KernelSU/releases/latest" 2>/dev/null       | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1 || true)
+    REL_JSON=$(curl -sL --retry 3 --retry-delay 5 --retry-all-errors --max-time 20 \
+      "https://api.github.com/repos/tiann/KernelSU/releases/latest" 2>/dev/null || true)
+    KSU_REL_TAG=$(printf '%s' "$REL_JSON" | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)
+    KSU_TAG_DATE=$(printf '%s' "$REL_JSON" | sed -n 's/.*"published_at"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)
     if [ -n "${KSU_REL_TAG:-}" ] && \
        git -c http.proxy= fetch -q --depth=1 origin "refs/tags/${KSU_REL_TAG}:refs/tags/${KSU_REL_TAG}" 2>/dev/null && \
        git checkout -q "refs/tags/${KSU_REL_TAG}" 2>/dev/null; then
-      info "KernelSU 已对齐官方 release: ${KSU_REL_TAG}"
+      info "KernelSU 已对齐官方 release: ${KSU_REL_TAG} (${KSU_TAG_DATE%%T*})"
     else
-      warn "KernelSU release tag 检出失败，回退 main（管理器需自编译同密钥版本）"
+      warn "KernelSU release tag 检出失败，回退 main"
       KSU_REL_TAG=""
+      KSU_TAG_DATE=""
     fi
   fi
   KSU_COMMITS=$(ksu_commit_count tiann/KernelSU "${KSU_REL_TAG:-main}")
@@ -132,7 +136,7 @@ WILD_DIR="$HOME/.cache_patches/wild_patches"
 mkdir -p "$HOME/.cache_patches"
 
 if [[ "$SUSFS_ENABLE" == "true" && "$KSU_TYPE" != "none" ]]; then
-  SUSFS_BRANCH="gki-${QCOM_SERIES:-android15-6.6}"
+  SUSFS_BRANCH="${SUSFS_BRANCH:-gki-${QCOM_SERIES:-android15-6.6}}"
   sync_repo "https://github.com/ShirkNeko/susfs4ksu.git" "$SUSFS_CACHE_DIR" "$SUSFS_BRANCH" || true &
 fi
 sync_repo "https://github.com/mrcxlinux/kernel_patches.git" "$ZRAM_CACHE_DIR" || true &
@@ -141,6 +145,20 @@ if [[ "$LZ4KD_ENABLE" == "true" ]]; then
 fi
 sync_repo "https://github.com/WildKernels/kernel_patches.git" "$WILD_DIR" || true &
 wait
+
+# release 模式下，SUSFS 补丁必须与 KernelSU 发布同期，否则会大面积 reject。
+if [[ "$KSU_TYPE" == "ksu" && "${KSU_CHANNEL:-main}" == "release" && -n "${KSU_TAG_DATE:-}" ]]; then
+  SUSFS_ERA_SHA=$(curl -sL --retry 3 --retry-delay 5 --retry-all-errors --max-time 20 \
+    "https://api.github.com/repos/ShirkNeko/susfs4ksu/commits?sha=${SUSFS_BRANCH}&until=${KSU_TAG_DATE}&per_page=1" 2>/dev/null \
+    | sed -n 's/.*"sha"[[:space:]]*:[[:space:]]*"\([0-9a-f]\{40\}\)".*/\1/p' | head -1)
+  if [ -n "$SUSFS_ERA_SHA" ] && \
+     glr -C "$SUSFS_CACHE_DIR" fetch -q --depth=1 origin "$SUSFS_ERA_SHA" 2>/dev/null && \
+     git -C "$SUSFS_CACHE_DIR" checkout -q FETCH_HEAD 2>/dev/null; then
+    info "SUSFS 已对齐 KernelSU 发布同期提交: ${SUSFS_ERA_SHA:0:8} (${KSU_TAG_DATE%%T*})"
+  else
+    warn "SUSFS 同期提交检出失败，将使用分支最新（可能与 release 不兼容）"
+  fi
+fi
 [ -d "$ZRAM_CACHE_DIR/.git" ] || die "zram_patches 预取失败（克隆失败且无本地缓存）"
 [ -d "$WILD_DIR/.git" ] || die "wild_patches 预取失败（克隆失败且无本地缓存）"
 if [[ "$SUSFS_ENABLE" == "true" && "$KSU_TYPE" != "none" ]] && [ ! -d "$SUSFS_CACHE_DIR/.git" ]; then
@@ -193,37 +211,38 @@ if [[ "$SUSFS_ENABLE" == "true" ]]; then
     info "为原版 KernelSU 添加补丁..."
     cp ./susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./KernelSU/ || warn "susfs-ksu 补丁文件缺失，跳过补丁应用"
     cd ./KernelSU
-    # SUSFS 补丁由第三方维护，可能落后于 KernelSU main（例如 2026-11-06 的 #3969 重构）。
-    # 自适应回退：从 main 往前找第一个能让补丁干净应用的提交，避免硬钉版本。
-    glr -C . fetch -q --depth=12 origin main 2>/dev/null || true
-    SUSFS_FIT=-1
-    for back in 0 1 2 3 4 5 6 7 8 9 10; do
-      if [ "$back" -gt 0 ]; then
-        git checkout -q "HEAD~1" 2>/dev/null || break
-      fi
-      if patch -p1 --dry-run --forward < 10_enable_susfs_for_ksu.patch >/dev/null 2>&1; then
-        SUSFS_FIT=$back
-        break
-      fi
-    done
-    if [ "$SUSFS_FIT" -lt 0 ]; then
-      error "在最近 11 个 KernelSU 提交中都找不到能应用 SUSFS 补丁的版本，中止构建"
-      exit 1
-    fi
-    if [ "$SUSFS_FIT" -gt 0 ]; then
-      NEW_SHA=$(git rev-parse HEAD)
-      NEW_COMMITS=$(ksu_commit_count tiann/KernelSU "$NEW_SHA")
-      NEW_COMMITS=${NEW_COMMITS:-0}
-      if [ "$NEW_COMMITS" -gt 0 ]; then
-        KSU_VERSION=$((NEW_COMMITS + 30000))
-        if grep -q '^KSUVER=' "$GITHUB_ENV" 2>/dev/null; then
-          sed -i "s/^KSUVER=.*/KSUVER=$KSU_VERSION/" "$GITHUB_ENV"
-        else
-          echo "KSUVER=$KSU_VERSION" >> "$GITHUB_ENV"
+    # SUSFS 补丁由第三方维护。release 模式已把 susfs4ksu 对齐到发布同期提交，
+    # 补丁应能干净应用；main 模式若上游重构导致失配，则自适应回退到可应用的提交。
+    SUSFS_FIT=0
+    if [ "${KSU_CHANNEL:-main}" = "main" ]; then
+      glr -C . fetch -q --depth=12 origin main 2>/dev/null || true
+      SUSFS_FIT=-1
+      for back in 0 1 2 3 4 5 6 7 8 9 10; do
+        if [ "$back" -gt 0 ]; then
+          git checkout -q "HEAD~1" 2>/dev/null || break
         fi
-        warn "KernelSU main 回退 ${SUSFS_FIT} 个提交以兼容 SUSFS 补丁（版本 $KSU_VERSION / ${NEW_SHA:0:8}）"
-      else
-        warn "KernelSU main 回退 ${SUSFS_FIT} 个提交以兼容 SUSFS 补丁（版本号未更新）"
+        if patch -p1 --dry-run --forward < 10_enable_susfs_for_ksu.patch >/dev/null 2>&1; then
+          SUSFS_FIT=$back
+          break
+        fi
+      done
+      if [ "$SUSFS_FIT" -lt 0 ]; then
+        error "在最近 11 个 KernelSU 提交中都找不到能应用 SUSFS 补丁的版本，中止构建"
+        exit 1
+      fi
+      if [ "$SUSFS_FIT" -gt 0 ]; then
+        NEW_SHA=$(git rev-parse HEAD)
+        NEW_COMMITS=$(ksu_commit_count tiann/KernelSU "$NEW_SHA")
+        NEW_COMMITS=${NEW_COMMITS:-0}
+        if [ "$NEW_COMMITS" -gt 0 ]; then
+          KSU_VERSION=$((NEW_COMMITS + 30000))
+          if grep -q '^KSUVER=' "$GITHUB_ENV" 2>/dev/null; then
+            sed -i "s/^KSUVER=.*/KSUVER=$KSU_VERSION/" "$GITHUB_ENV"
+          else
+            echo "KSUVER=$KSU_VERSION" >> "$GITHUB_ENV"
+          fi
+          warn "KernelSU main 回退 ${SUSFS_FIT} 个提交以兼容 SUSFS 补丁（版本 $KSU_VERSION / ${NEW_SHA:0:8}）"
+        fi
       fi
     fi
     patch -p1 < 10_enable_susfs_for_ksu.patch > /tmp/susfs_ksu.log 2>&1 || true
