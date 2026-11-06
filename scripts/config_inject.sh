@@ -258,9 +258,7 @@ echo "LOCALVER=$LOCALVER" >> "$GITHUB_ENV"
 sed -i '/^CONFIG_LOCALVERSION=/d' ./common/arch/arm64/configs/gki_defconfig
 echo "CONFIG_LOCALVERSION=\"${LOCALVER}\"" >> ./common/arch/arm64/configs/gki_defconfig
 
-for f in ./common/scripts/setlocalversion; do
-  sed -i 's|^echo "\$res"$|echo "'"${LOCALVER}"'"|' "$f"
-done
+sed -i 's|^echo "\$res"$|echo "'"${LOCALVER}"'"|' ./common/scripts/setlocalversion
 
 # HZ=300
 info "启用 HZ=300..."
