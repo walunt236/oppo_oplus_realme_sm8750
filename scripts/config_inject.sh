@@ -47,7 +47,7 @@ CONFIG_CRYPTO_842=y
 LZ4KDCFG
 fi
 
-# zram 双重压缩：主算法 lz4（解压快，页错误延迟低）+ 冷数据由 zstd 重压缩（压缩率高）
+# zram 双重压缩：主算法 lz4（解压快，页错误延迟低）+ 冷数据由 lz4hc 重压缩（压缩率高）
 # 不能放进 LZ4KD 条件块：否则关闭 lz4kd 时会退回 Kconfig 默认的 lzo-rle
 cat >> "$DCFG" << 'ZRAMDEFCFG'
 CONFIG_ZRAM_DEF_COMP_LZ4=y
@@ -143,7 +143,7 @@ grep -q "CFLAGS_configs.o := -D__IKCFG_BUILD" ./common/kernel/Makefile || \
 grep -q "CFLAGS_REMOVE_configs.o" ./common/kernel/Makefile || \
   echo 'CFLAGS_REMOVE_configs.o := -flto=thin -fsplit-lto-unit' >> ./common/kernel/Makefile
 
-apply_patch_file "other_patch/zram_recomp_default.patch" /tmp/zram_recomp.patch strict "zram 默认 zstd 重压缩算法补丁"
+apply_patch_file "other_patch/zram_recomp_default.patch" /tmp/zram_recomp.patch strict "zram 多级压缩补丁"
 # zram 源码级调整：开机首次 disksize 不低于 6GB + 重压缩按绝对占用判断
 if [ -f ./common/drivers/block/zram/zram_drv.c ]; then
   python3 "$GITHUB_WORKSPACE/scripts/zram_src_tune.py" ./common/drivers/block/zram/zram_drv.c ||     warn "zram 源码调整失败（不影响构建，行为保持上游）"
