@@ -59,4 +59,16 @@ FUNCS=$("$PROFDATA" show -sample "$OUT" 2>/dev/null | grep -c '^Function: ' || e
 HASH=$(md5sum "$OUT" | cut -c1-8)
 ln -sf kernel.afdo "$AFDO_DIR/kernel-$HASH.afdo"
 echo "[OK] 已安装: $OUT ($(du -h "$OUT" | cut -f1), $FUNCS 个函数, hash=$HASH)"
+# 记录 profile 与 vmlinux 的绑定关系，供构建期做一致性校验
+NM_BIN="$(dirname "$PROFDATA")/llvm-nm"
+if [ -x "$NM_BIN" ]; then
+  SYMS_HASH=$("$NM_BIN" --defined-only "$VMLINUX" 2>/dev/null | awk '$2 ~ /^[tT]$/ {print $1, $3}' | md5sum | cut -c1-16)
+  {
+    echo "vmlinux=$VMLINUX"
+    echo "vmlinux_syms=$SYMS_HASH"
+    echo "samples=$*"
+    echo "generated=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  } > "$AFDO_DIR/kernel.afdo.meta"
+  echo "[INFO] 已记录校验信息 (符号表 hash=$SYMS_HASH)"
+fi
 echo "[NEXT] 派发构建时选择 afdo_mode=use（优先使用这份自采样本）"
