@@ -191,9 +191,9 @@ ld.lld --version
 if [ "$AFDO_PROFILE_VALID" -eq 1 ] && [ -n "${AFDO_VMLINUX:-}" ] && [ -f "$AFDO_VMLINUX" ]; then
   PROFDATA="$HOME/.toolchains/Clang-19.0.0git-20240723/bin/llvm-profdata"
   NM="$HOME/.toolchains/Clang-19.0.0git-20240723/bin/llvm-nm"
-  "$PROFDATA" show -sample "$AFDO_PROFILE" 2>/dev/null | grep '^Function: ' | awk '{print $2}' | sed 's/:.*//' | sort -u > /tmp/afdo_funcs.txt || true
-  "$NM" --defined-only "$AFDO_VMLINUX" 2>/dev/null | awk '$2 ~ /^[tT]$/ {print $3}' | sort -u > /tmp/vmlinux_funcs.txt || true
-  MATCH=$(comm -12 /tmp/afdo_funcs.txt /tmp/vmlinux_funcs.txt | wc -l || true)
+  "$PROFDATA" show -sample "$AFDO_PROFILE" 2>/dev/null | grep '^Function: ' | awk '{print $2}' | sed 's/:.*//' | LC_ALL=C sort -u > /tmp/afdo_funcs.txt || true
+  "$NM" --defined-only "$AFDO_VMLINUX" 2>/dev/null | awk '$2 ~ /^[tT]$/ {print $3}' | LC_ALL=C sort -u > /tmp/vmlinux_funcs.txt || true
+  MATCH=$(LC_ALL=C comm -12 /tmp/afdo_funcs.txt /tmp/vmlinux_funcs.txt | wc -l || true)
   TOTAL=$(wc -l < /tmp/afdo_funcs.txt)
   if [ "$TOTAL" -gt 0 ]; then
     RATE=$(awk -v m="$MATCH" -v t="$TOTAL" 'BEGIN{printf "%.1f", m*100/t}')
