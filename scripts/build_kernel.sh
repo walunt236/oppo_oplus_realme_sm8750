@@ -83,11 +83,11 @@ if [[ "$STORED_CFG" != "$CFG_HASH" ]]; then
   echo "CFG_HASH=$CFG_HASH" >> "$GITHUB_ENV"
 fi
 
-if [[ "$LZ4KD_ENABLE" == "true" ]] && [ -f out/.config ]; then
-  if grep -q '^CONFIG_ZRAM_DEF_COMP_LZ4=y' out/.config && grep -q '^CONFIG_ZRAM_DEF_COMP="lz4"' out/.config; then
-    info "ZRAM 主算法配置生效 (lz4 NEON + MULTI_COMP/zstd 双重压缩)"
+if [ -f out/.config ]; then
+  if grep -q '^CONFIG_ZRAM_DEF_COMP="lz4"' out/.config && grep -q '^CONFIG_ZRAM_DEF_COMP_LZ4=y' out/.config; then
+    info "zram 主算法 lz4（次级 zstd 冷数据重压缩）"
   else
-    die "LZ4KD 配置未生效，中止构建"
+    die "zram 主算法未配置为 lz4（当前: $(grep '^CONFIG_ZRAM_DEF_COMP=' out/.config 2>/dev/null || echo 无)）"
   fi
 fi
 
