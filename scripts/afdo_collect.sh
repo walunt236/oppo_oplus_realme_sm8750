@@ -57,7 +57,8 @@ fi
 [ -s "$OUT" ] || { echo "[ERROR] profile 生成失败"; exit 1; }
 FUNCS=$("$PROFDATA" show -sample "$OUT" 2>/dev/null | grep -c '^Function: ' || echo 0)
 HASH=$(md5sum "$OUT" | cut -c1-8)
-ln -sf kernel.afdo "$AFDO_DIR/kernel-$HASH.afdo"
+rm -f "$AFDO_DIR/kernel-$HASH.afdo"
+cp -f "$AFDO_DIR/kernel.afdo" "$AFDO_DIR/kernel-$HASH.afdo"
 echo "[OK] 已安装: $OUT ($(du -h "$OUT" | cut -f1), $FUNCS 个函数, hash=$HASH)"
 # 记录 profile 与 vmlinux 的绑定关系，供构建期做一致性校验
 NM_BIN="$(dirname "$PROFDATA")/llvm-nm"
