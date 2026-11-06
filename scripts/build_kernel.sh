@@ -188,7 +188,7 @@ info "链接器版本检查："
 ld.lld --version
 
 # AutoFDO profile 新鲜度检测
-if [ -n "$AFDO_PROFILE" ] && [ -n "${AFDO_VMLINUX:-}" ] && [ -f "$AFDO_VMLINUX" ]; then
+if [ "$AFDO_PROFILE_VALID" -eq 1 ] && [ -n "${AFDO_VMLINUX:-}" ] && [ -f "$AFDO_VMLINUX" ]; then
   PROFDATA="$HOME/.toolchains/Clang-19.0.0git-20240723/bin/llvm-profdata"
   NM="$HOME/.toolchains/Clang-19.0.0git-20240723/bin/llvm-nm"
   "$PROFDATA" show -sample "$AFDO_PROFILE" 2>/dev/null | grep '^Function: ' | awk '{print $2}' | sed 's/:.*//' | sort -u > /tmp/afdo_funcs.txt || true
