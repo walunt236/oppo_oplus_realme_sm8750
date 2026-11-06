@@ -39,7 +39,7 @@ if [[ "$KPM_ENABLE" == 'kpn' ]]; then
       -o kptools-linux "https://github.com/KernelSU-Next/KPatch-Next/releases/latest/download/kptools-linux" 2>/dev/null || true
     curl -fSL --retry 3 --retry-delay 5 --retry-all-errors --connect-timeout 10 --max-time 30 \
       -o kpimg-linux "https://github.com/KernelSU-Next/KPatch-Next/releases/latest/download/kpimg-linux" 2>/dev/null || true
-    [ -s kptools-linux ] && [ -s kpimg-linux ] && KPN_OK=1
+    if [ -s kptools-linux ] && [ -s kpimg-linux ]; then KPN_OK=1; fi
   fi
   if [ "$KPN_OK" -eq 1 ]; then
     chmod +x ./kptools-linux
