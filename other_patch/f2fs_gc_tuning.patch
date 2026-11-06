@@ -1,0 +1,106 @@
+From 76d6903103f2486f194c92b11a23933595297d3a Mon Sep 17 00:00:00 2001
+From: Panchajanya1999 <rsk52959@gmail.com>
+Date: Wed, 16 Feb 2022 00:26:59 +0530
+Subject: [PATCH] f2fs/gc: Reduce GC thread urgent sleep time to 50ms
+
+Android sets the value to 50ms via vold's IdleMaint service. Since
+500ms is too long for GC to colllect all invalid segments in time
+which results in performance degradation.
+
+On un-encrypted device, vold fails to set this value to 50ms thus
+degrades the performance over time.
+
+Based on [1].
+
+[1] https://github.com/topjohnwu/Magisk/pull/5462
+Signed-off-by: Panchajanya1999 <rsk52959@gmail.com>
+Change-Id: I80f2c29558393d726d5e696aaf285096c8108b23
+Signed-off-by: Panchajanya1999 <rsk52959@gmail.com>
+Signed-off-by: Pranav Vashi <neobuddy89@gmail.com>
+---
+ fs/f2fs/gc.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/fs/f2fs/gc.h b/fs/f2fs/gc.h
+index 5c1eaf55e1277..00db8333f2986 100644
+--- a/fs/f2fs/gc.h
++++ b/fs/f2fs/gc.h
+@@ -10,7 +10,7 @@
+ 						 * whether IO subsystem is idle
+ 						 * or not
+ 						 */
+-#define DEF_GC_THREAD_URGENT_SLEEP_TIME	500	/* 500 ms */
++#define DEF_GC_THREAD_URGENT_SLEEP_TIME	50	/* 50 ms */
+ #define DEF_GC_THREAD_MIN_SLEEP_TIME	30000	/* milliseconds */
+ #define DEF_GC_THREAD_MAX_SLEEP_TIME	60000
+ #define DEF_GC_THREAD_NOGC_SLEEP_TIME	300000	/* wait 5 min */
+From bcece71b5a925bb9ef038284ef031b057f207b81 Mon Sep 17 00:00:00 2001
+From: Park Ju Hyung <qkrwngud825@gmail.com>
+Date: Mon, 1 Jun 2020 19:45:02 +0900
+Subject: [PATCH] f2fs: reduce timeout for uncongestion
+
+On high fs utilization, congestion is hit quite frequently and waiting for a
+whooping 20ms is too expensive, especially on critical paths.
+
+Reduce it to an amount that is unlikely to affect UI rendering paths.
+
+The new times are as follows:
+  100 Hz  => 1 jiffy   (effective: 10 ms)
+  250 Hz  => 2 jiffies (effective: 8 ms)
+  300 Hz  => 2 jiffies (effective: 6 ms)
+  1000 Hz => 6 jiffies (effective: 6 ms)
+
+Co-authored-by: Danny Lin <danny@kdrag0n.dev>
+Signed-off-by: Park Ju Hyung <qkrwngud825@gmail.com>
+---
+ fs/f2fs/f2fs.h | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/fs/f2fs/f2fs.h b/fs/f2fs/f2fs.h
+index 6e84dcc8c76e5..372080ca29a04 100644
+--- a/fs/f2fs/f2fs.h
++++ b/fs/f2fs/f2fs.h
+@@ -596,8 +596,8 @@ enum {
+ 
+ #define DEFAULT_RETRY_IO_COUNT	8	/* maximum retry read IO or flush count */
+ 
+-/* congestion wait timeout value, default: 20ms */
+-#define	DEFAULT_IO_TIMEOUT	(msecs_to_jiffies(20))
++/* congestion wait timeout value, default: 6ms */
++#define	DEFAULT_IO_TIMEOUT	(msecs_to_jiffies(6))
+ 
+ /* maximum retry quota flush count */
+ #define DEFAULT_RETRY_QUOTA_FLUSH_COUNT		8
+From 4612e45ba92cbfcaba1e34dc9e744a0f728dfea8 Mon Sep 17 00:00:00 2001
+From: Jesse Chan <jc@linux.com>
+Date: Sun, 12 Apr 2020 09:35:14 +0000
+Subject: [PATCH] f2fs: Enlarge min_fsync_blocks to 20
+
+In OPPO's kernel:
+enlarge min_fsync_blocks to optimize performance
+  - yanwu@TECH.Storage.FS.oF2FS, 2019/08/12
+
+Huawei is also doing this in their production kernel.
+
+If this optimization is good for them and shipped
+with their devices, it should be good for us.
+
+Signed-off-by: Jesse Chan <jc@linux.com>
+Signed-off-by: Adithya R <gh0strider.2k18.reborn@gmail.com>
+---
+ fs/f2fs/segment.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/fs/f2fs/segment.h b/fs/f2fs/segment.h
+index 07dcbcbeb7c6d..d7576e8246602 100644
+--- a/fs/f2fs/segment.h
++++ b/fs/f2fs/segment.h
+@@ -777,7 +777,7 @@ static inline int utilization(struct f2fs_sb_info *sbi)
+  * F2FS_IPU_DISABLE - disable IPU. (=default option in LFS mode)
+  */
+ #define DEF_MIN_IPU_UTIL	70
+-#define DEF_MIN_FSYNC_BLOCKS	8
++#define DEF_MIN_FSYNC_BLOCKS	20
+ #define DEF_MIN_HOT_BLOCKS	16
+ 
+ #define SMALL_VOLUME_SEGMENTS	(16 * 512)	/* 16GB */
