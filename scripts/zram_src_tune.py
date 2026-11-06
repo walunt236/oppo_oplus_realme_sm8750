@@ -1,80 +1,92 @@
 #!/usr/bin/env python3
 """调整内核里的 zram 行为（幂等，可重复调用）
 
-1) 开机首次设置的 disksize 下限（默认 6144MB）：
-   本机型厂商脚本 init.kernel.post_boot-memory.sh 硬编码 4GB，
-   这里在 zram 首次初始化时抬到 6GB；之后用户手动调整不再干预。
-2) 自动冷数据重压缩调优：
-   - 次级算法 zstd -> lz4hc（压缩比 +5%，解压速度不退化，走同一套 ARMv8 汇编）
-   - 只在 PSI >= 5% 时工作，避免无压力时空转
-   - 每周期最多处理 8192 页，限制 CPU 峰值
-   - 已用次级算法压缩过的页直接跳过，避免重复解压
+1) 开机首次 discs ize 下限（默认 6144MB）
+2) 自动冷数据重压缩：次级 lz4hc、PSI 门控、8192 页上限、跳过已重压缩页
 
-由 scripts/config_inject.sh 在应用 other_patch/zram_recomp_default.patch 之后调用。
+同时把自身内容哈希写入内核（"zram-tune:<rev>"）并导出到 GITHUB_ENV，
+供 scripts/build_kernel.sh 在构建后校验，防止增量构建复用旧目标文件。
 """
+import hashlib
+import os
 import sys
 
 MIN_MB = 6144
 
 GLOBALS_ANCHOR = "static unsigned int num_devices = 1;"
-GLOBALS_ADD = r'''
+
+CLAMP_ANCHOR = "\tdisksize = PAGE_ALIGN(disksize);"
+
+MAXPAGES_OLD = "#define ZRAM_AUTO_RECOMP_MAX_PAGES\t50000"
+LOW_OLD = "\tif (usage < ZRAM_AUTO_RECOMP_USAGE_MID &&\n\t    psi_some < ZRAM_AUTO_RECOMP_PSI_HIGH) {"
+LOW_NEW = ("\t/* 只有内存压力上来时才做重压缩 */\n"
+           "\tif (psi_some < ZRAM_AUTO_RECOMP_PSI_LOW) {")
+HIGH_OLD = "\t} else if (usage >= ZRAM_AUTO_RECOMP_USAGE_HIGH ||\n\t\t   psi_some >= ZRAM_AUTO_RECOMP_PSI_HIGH) {"
+HIGH_NEW = "\t} else if (psi_some >= ZRAM_AUTO_RECOMP_PSI_HIGH) {"
+HUGE_ANCHOR = "\t\t\t/* idle+huge 页统计（不可压缩观测数据） */"
+SEC_OLD = 'kstrdup("zstd", GFP_KERNEL)'
+SEC_NEW = 'kstrdup("lz4hc", GFP_KERNEL)'
+
+
+def build_snippets(marker):
+    globals_add = r'''
 
 /* 开机首次 disksize 下限（MB）：厂商脚本在本机型硬编码 4GB，
  * 首次初始化时抬到 zram_boot_min_mb；之后用户自行调整不再干预。 */
 static unsigned int zram_boot_min_mb = 6144;
 module_param(zram_boot_min_mb, uint, 0644);
-static bool zram_boot_min_applied;'''
+static bool zram_boot_min_applied;
+static const char zram_tune_rev[] = "@@MARKER@@";'''.replace("@@MARKER@@", marker)
 
-CLAMP_ANCHOR = "\tdisksize = PAGE_ALIGN(disksize);"
-CLAMP_ADD = r'''	/* 首次初始化强制不低于 zram_boot_min_mb */
+    clamp_add = r'''	/* 首次初始化强制不低于 zram_boot_min_mb（同时输出调优版本标记） */
 	if (!zram_boot_min_applied && zram_boot_min_mb) {
 		u64 boot_min = (u64)zram_boot_min_mb << 20;
 
 		if (disksize < boot_min) {
-			pr_info("zram: boot disksize %llu MB -> %u MB\n",
-				disksize >> 20, zram_boot_min_mb);
+			pr_info("zram: boot disksize %llu MB -> %u MB [%s]\n",
+				disksize >> 20, zram_boot_min_mb, zram_tune_rev);
 			disksize = boot_min;
 		}
 		zram_boot_min_applied = true;
 	}
 '''
-
-MAXPAGES_OLD = "#define ZRAM_AUTO_RECOMP_MAX_PAGES\t50000"
-MAXPAGES_NEW = ("#define ZRAM_AUTO_RECOMP_MAX_PAGES\t8192\n"
-                "/* 内存压力低于 5% 时不重压缩，避免空转烧 CPU */\n"
-                "#define ZRAM_AUTO_RECOMP_PSI_LOW\t500")
-
-LOW_OLD = "\tif (usage < ZRAM_AUTO_RECOMP_USAGE_MID &&\n\t    psi_some < ZRAM_AUTO_RECOMP_PSI_HIGH) {"
-LOW_NEW = ("\t/* 只有内存压力上来时才做重压缩 */\n"
-           "\tif (psi_some < ZRAM_AUTO_RECOMP_PSI_LOW) {")
-
-HIGH_OLD = "\t} else if (usage >= ZRAM_AUTO_RECOMP_USAGE_HIGH ||\n\t\t   psi_some >= ZRAM_AUTO_RECOMP_PSI_HIGH) {"
-HIGH_NEW = "\t} else if (psi_some >= ZRAM_AUTO_RECOMP_PSI_HIGH) {"
-
-HUGE_ANCHOR = "\t\t\t/* idle+huge 页统计（不可压缩观测数据） */"
-HUGE_ADD = r'''			/* 已用次级算法压缩过，跳过以免每轮重复解压 */
+    maxpages_new = ("#define ZRAM_AUTO_RECOMP_MAX_PAGES\t8192\n"
+                    "/* 内存压力低于 5% 时不重压缩，避免空转烧 CPU */\n"
+                    "#define ZRAM_AUTO_RECOMP_PSI_LOW\t500")
+    huge_add = r'''			/* 已用次级算法压缩过，跳过以免每轮重复解压 */
 			if (zram_get_priority(zram, index) >= prio)
 				goto next;
 '''
-
-SEC_OLD = 'kstrdup("zstd", GFP_KERNEL)'
-SEC_NEW = 'kstrdup("lz4hc", GFP_KERNEL)'
+    return globals_add, clamp_add, maxpages_new, huge_add
 
 
-def patch(path):
+def main():
+    if len(sys.argv) < 2:
+        sys.exit("用法: zram_src_tune.py <zram_drv.c>")
+    path = sys.argv[1]
+
+    # 用所有插入内容算出版本标记：脚本一改，标记就变
+    probe_globals, probe_clamp, probe_max, probe_huge = build_snippets("REV")
+    rev_src = "".join([probe_globals, probe_clamp, probe_max,
+                       probe_huge, LOW_NEW, HIGH_NEW, SEC_NEW])
+    rev = hashlib.md5(rev_src.encode("utf-8")).hexdigest()[:10]
+    marker = "zram-tune:" + rev
+    globals_add, clamp_add, maxpages_new, huge_add = build_snippets(marker)
+
     s = open(path, encoding="utf-8").read()
     if "zram_boot_min_mb" in s:
         print("[INFO] zram 源码已调整，跳过")
         return 0
+
     n = 0
     if GLOBALS_ANCHOR in s:
-        s = s.replace(GLOBALS_ANCHOR, GLOBALS_ANCHOR + GLOBALS_ADD, 1)
+        s = s.replace(GLOBALS_ANCHOR, GLOBALS_ANCHOR + globals_add, 1)
         n += 1
     if CLAMP_ANCHOR in s:
-        s = s.replace(CLAMP_ANCHOR, CLAMP_ADD + CLAMP_ANCHOR, 1)
+        s = s.replace(CLAMP_ANCHOR, clamp_add + CLAMP_ANCHOR, 1)
         n += 1
     if MAXPAGES_OLD in s:
-        s = s.replace(MAXPAGES_OLD, MAXPAGES_NEW, 1)
+        s = s.replace(MAXPAGES_OLD, maxpages_new, 1)
         n += 1
     if LOW_OLD in s:
         s = s.replace(LOW_OLD, LOW_NEW, 1)
@@ -83,20 +95,24 @@ def patch(path):
         s = s.replace(HIGH_OLD, HIGH_NEW, 1)
         n += 1
     if HUGE_ANCHOR in s:
-        s = s.replace(HUGE_ANCHOR, HUGE_ADD + HUGE_ANCHOR, 1)
+        s = s.replace(HUGE_ANCHOR, huge_add + HUGE_ANCHOR, 1)
         n += 1
     cnt = s.count(SEC_OLD)
     if cnt:
         s = s.replace(SEC_OLD, SEC_NEW)
         n += cnt
-    if n < 7:
-        print("[WARN] zram 源码仅匹配到 %d 处（预期 7+），上游可能变化" % n)
+    if n < 8:
+        print("[WARN] zram 源码仅匹配到 %d 处（预期 8+），上游可能变化" % n)
     open(path, "w", encoding="utf-8").write(s)
-    print("[INFO] zram 源码调整完成（%d 处）：开机下限 %dMB + lz4hc 次级 + PSI 门控 + 8192 页上限" % (n, MIN_MB))
+
+    genv = os.environ.get("GITHUB_ENV")
+    if genv:
+        with open(genv, "a", encoding="utf-8") as f:
+            f.write("ZRAM_TUNE_REV=%s\n" % marker)
+    print("[INFO] zram 源码调整完成（%d 处）：开机下限 %dMB + lz4hc 次级 + PSI 门控 + 8192 页上限 [%s]"
+          % (n, MIN_MB, marker))
     return 0
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        sys.exit("用法: zram_src_tune.py <zram_drv.c>")
-    sys.exit(patch(sys.argv[1]))
+    sys.exit(main())
