@@ -150,6 +150,10 @@ jobs:
           git reset --hard FETCH_HEAD
           git clean -fdq -e kernel_workspace
 
+      - name: 代码静态检查
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          bash scripts/lint.sh
       - name: 环境初始化
         id: init_env
         run: bash "$GITHUB_WORKSPACE/scripts/init_env.sh"
