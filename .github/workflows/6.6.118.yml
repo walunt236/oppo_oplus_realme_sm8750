@@ -198,6 +198,7 @@ jobs:
               fi
               AFDO_HASH=$(md5sum "$PROFILE_SRC" | cut -c1-8)
               AFDO_LINK="$AFDO_DIR/kernel-$AFDO_HASH.afdo"
+              rm -f "$AFDO_LINK"
               cp -f "$PROFILE_SRC" "$AFDO_LINK"   # 拷贝而非软链：构建期间 profile 内容必须不可变
               echo "AFDO_PROFILE=$AFDO_LINK" >> "$GITHUB_ENV"
               # profile 与 vmlinux 的符号表一致性校验（防止采样后内核又变过）
