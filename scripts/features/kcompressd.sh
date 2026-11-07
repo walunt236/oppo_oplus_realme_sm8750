@@ -4,7 +4,7 @@
 #
 # 6.6 适配要点（详见 other_patch/kcompressd/kcompressd-6.6.patch）：
 #   - __swap_writepage() 仍收 struct page *，改用 &folio->page
-#   - 无 folio->swap，改用 folio_swap_flags() 读取 SWP_SYNCHRONOUS_IO
+#   - vendor 6.6.143 已回移 folio->swap，保留 swp_swap_info() 读取 SWP_SYNCHRONOUS_IO
 #   - 无 zswap_is_enabled()，用 zswap_never_enabled() 近似
 #   - 无 mem_cgroup_zswap_writeback_enabled()，移除该门控
 #   - 6.6 kfifo.h 会经 scatterlist.h 反向包含 mm.h，不能放进 mmzone.h，

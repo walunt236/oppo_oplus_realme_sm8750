@@ -162,7 +162,7 @@ diff --git a/mm/page_io.c b/mm/page_io.c
 +	 * to __swap_writepage(), so off-loading is still safe.
 +	 */
 +	if (zswap_never_enabled() &&
-+		!data_race(folio_swap_flags(folio) & SWP_SYNCHRONOUS_IO))
++		!data_race(swp_swap_info(folio->swap)->flags & SWP_SYNCHRONOUS_IO))
 +		return false;
 +
 +	/*
