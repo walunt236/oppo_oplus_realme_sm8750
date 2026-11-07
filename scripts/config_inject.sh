@@ -578,6 +578,7 @@ echo "# CONFIG_INIT_ON_ALLOC_DEFAULT_ON is not set" >> "$DCFG"
 echo "# CONFIG_SHUFFLE_PAGE_ALLOCATOR is not set" >> "$DCFG"
 # BORE 调度器（补丁自带 Kconfig，默认 y；显式写出便于日志确认）
 # BORE 实验暂停：等适配版补丁后再启用
+# # BORE 实验暂停（等适配版补丁）
 # echo "CONFIG_SCHED_BORE=y" >> "$DCFG"
 info "已关闭 INIT_ON_ALLOC / SHUFFLE_PAGE_ALLOCATOR（性能优先）"
 
