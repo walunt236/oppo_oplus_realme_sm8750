@@ -81,7 +81,21 @@ find_latest() {
 
 apply_patch_file() {
   local src="$1" out="$2" mode="$3" label="$4"
+  local log
   cp "$GITHUB_WORKSPACE/$src" "$out" || { warn "$label 源文件缺失，跳过"; return 0; }
+  log=$(mktemp)
+  if ( cd ./common && patch -p1 -F 3 < "$out" > "$log" 2>&1 ); then
+    info "$label 应用成功"
+  elif grep -qE "previously applied|Skipping patch" "$log"; then
+    warn "$label 已由上游补丁覆盖，跳过（视为成功）"
+  elif [[ "$mode" == "strict" ]]; then
+    grep -E "FAILED|Hunk" "$log" | head -5 || true
+    die "$label 应用失败，中止构建"
+  else
+    warn "$label 应用失败，继续..."
+  fi
+  rm -f "$log"
+}
   if ( cd ./common && patch -p1 -F 3 < "$out" ); then
     info "$label 应用成功"
   elif ( cd ./common && patch -p1 -F 3 -R --dry-run < "$out" >/dev/null 2>&1 ); then
