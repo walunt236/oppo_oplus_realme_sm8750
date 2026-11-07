@@ -238,9 +238,11 @@ if [ "$AFDO_PROFILE_VALID" -eq 1 ]; then
   HOT_TMP=/tmp/hot_symbols.txt
   if [ -x "$PROFDATA_HOT" ]; then
     "$PROFDATA_HOT" show -sample "$AFDO_PROFILE" 2>/dev/null | awk '
-      /^Function: / { name=$2 }
-      /Total samples: / { print $3, name }
-    ' | LC_ALL=C sort -k1,1nr | head -3000 | awk '{print $2}' | grep -E '^[A-Za-z_][A-Za-z0-9_.$]*$' > "$HOT_TMP" || true
+      /^Function: / {
+        name=$2; sub(/:.*$/, "", name);
+        cnt=$3; sub(/,.*$/, "", cnt);
+        if (name != "" && cnt+0 > 0) print cnt, name;
+      }' | LC_ALL=C sort -nr | head -3000 | awk '{print $2}' | grep -E '^[A-Za-z_][A-Za-z0-9_.$]*$' > "$HOT_TMP" || true
   fi
   if [ ! -s "$HOT_TMP" ]; then
     grep -E '^[A-Za-z_][A-Za-z0-9_.$]*:[0-9]+$' "$AFDO_PROFILE" 2>/dev/null | LC_ALL=C sort -t: -k2 -nr | head -3000 | cut -d: -f1 > "$HOT_TMP" || true
