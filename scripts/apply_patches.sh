@@ -580,30 +580,5 @@ fi
 touch /tmp/sync_failed.list "$PENDING_SYNC"
 sort -u "$PENDING_SYNC" /tmp/sync_failed.list -o "$PENDING_SYNC"
 
-# ---- BORE 调度器（实验：验证 6.6 补丁编译与 ABI）----
-if [[ "${BORE_ENABLE:-true}" == "true" ]]; then
-  BORE_PATCH="$GITHUB_WORKSPACE/other_patch/bore-6.6.patch"
-  if [ -f "$BORE_PATCH" ]; then
-    info "应用 BORE 调度器补丁..."
-    patch -p1 -N -F 3 < "$BORE_PATCH" > /tmp/bore.log 2>&1 || true
-    if grep -q "FAILED" /tmp/bore.log; then
-      warn "BORE 补丁存在未应用 hunk："
-      grep -E "FAILED|Hunk" /tmp/bore.log | head -8
-    fi
-    if [ -f kernel/sched/bore.c ] && [ -f include/linux/sched/bore.h ]; then
-      info "BORE 新文件已生成（bore.c / bore.h）"
-    else
-      warn "BORE 新文件缺失，补丁可能未完整应用"
-    fi
-    python3 "$GITHUB_WORKSPACE/scripts/bore_fixup.py" kernel/sched/fair.c 2>&1 || warn "BORE fixup 执行失败"
-    python3 "$GITHUB_WORKSPACE/scripts/bore_kabi.py" include/linux/sched.h 2>&1 || warn "BORE KABI 变换失败"
-    BORE_FILES="$GITHUB_WORKSPACE/other_patch/bore_files"
-    [ -f "$BORE_FILES/bore.c" ] && cp -f "$BORE_FILES/bore.c" kernel/sched/bore.c
-    [ -f "$BORE_FILES/bore.h" ] && cp -f "$BORE_FILES/bore.h" include/linux/sched/bore.h
-    info "BORE 适配文件已覆盖（KABI 保留区方案）"
-    _rej=$(find . -name "*.rej" 2>/dev/null | head -5)
-    [ -n "$_rej" ] && warn "残留 rej 文件: $_rej"
-  else
-    warn "BORE 补丁文件不存在: $BORE_PATCH"
-  fi
-fi
+# ---- BORE 调度器（独立功能脚本，BORE_ENABLE 开关）----
+bash "$GITHUB_WORKSPACE/scripts/feature_bore.sh" || warn "BORE 功能脚本执行失败"
