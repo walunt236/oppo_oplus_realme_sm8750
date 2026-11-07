@@ -170,7 +170,14 @@ export KBUILD_BUILD_HOST="ubuntu-build"
 mkdir -p "$HOME/.thinlto-cache"
 cat << 'EOF' > ld-wrapper
 #!/bin/sh
-exec ld.lld --thinlto-cache-dir="$HOME/.thinlto-cache" --thinlto-cache-policy=cache_size_bytes=4g --thinlto-jobs="$(nproc --all)" "$@"
+ORDER=""
+for a in "$@"; do
+  case "$a" in -r|--relocatable) ORDER=""; break;; esac
+done
+if [ -z "$ORDER" ] && [ -n "${HOTFILE:-}" ] && [ -s "${HOTFILE:-}" ]; then
+  ORDER="--symbol-ordering-file=$HOTFILE"
+fi
+exec ld.lld --thinlto-cache-dir="$HOME/.thinlto-cache" --thinlto-cache-policy=cache_size_bytes=4g --thinlto-jobs="$(nproc --all)" $ORDER "$@"
 EOF
 chmod +x ld-wrapper
 
@@ -223,6 +230,21 @@ if [ "$AFDO_PROFILE_VALID" -eq 1 ] && [ -n "${AFDO_VMLINUX:-}" ] && [ -f "$AFDO_
   fi
 elif [ "$AFDO_PROFILE_VALID" -eq 1 ]; then
   warn "AutoFDO 新鲜度防线未启用（AFDO_VMLINUX 未配置或文件不存在）"
+fi
+
+# AFDO 热函数排序表（链接期函数布局，类似 BOLT，仅改布局不改代码）
+if [ "$AFDO_PROFILE_VALID" -eq 1 ]; then
+  PROFDATA_HOT="$HOME/.toolchains/Clang-19.0.0git-20240723/bin/llvm-profdata"
+  if [ -x "$PROFDATA_HOT" ]; then
+    "$PROFDATA_HOT" show -sample "$AFDO_PROFILE" 2>/dev/null | awk '
+      /^Function: / { name=$2 }
+      /Total samples: / { print $3, name }
+    ' | LC_ALL=C sort -k1,1nr | head -3000 | awk '{print $2}' | grep -E '^[A-Za-z_][A-Za-z0-9_.$]*$' > /tmp/hot_symbols.txt || true
+    if [ -s /tmp/hot_symbols.txt ]; then
+      export HOTFILE=/tmp/hot_symbols.txt
+      info "AFDO 热函数排序表: $(wc -l < "$HOTFILE") 个符号（链接期排序）"
+    fi
+  fi
 fi
 # 编译器参数官方工具链支持验证
 info "编译器参数支持验证（ZyCromerZ clang 19 官方工具链）:"
