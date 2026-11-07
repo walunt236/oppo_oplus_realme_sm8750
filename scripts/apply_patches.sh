@@ -71,3 +71,5 @@ bash "$GITHUB_WORKSPACE/scripts/features/bore.sh"
 
 # Kcompressd（默认关闭，KCOMPRESSD_ENABLE=true 才应用）
 bash "$GITHUB_WORKSPACE/scripts/features/kcompressd.sh"
+# WildKernels 额外小补丁（默认启用）
+bash "$GITHUB_WORKSPACE/scripts/features/wild_extra.sh"
