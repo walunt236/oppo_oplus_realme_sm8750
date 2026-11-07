@@ -579,6 +579,3 @@ fi
 
 touch /tmp/sync_failed.list "$PENDING_SYNC"
 sort -u "$PENDING_SYNC" /tmp/sync_failed.list -o "$PENDING_SYNC"
-
-# ---- BORE 调度器（独立功能脚本，BORE_ENABLE 开关）----
-bash "$GITHUB_WORKSPACE/scripts/feature_bore.sh" || warn "BORE 功能脚本执行失败"
