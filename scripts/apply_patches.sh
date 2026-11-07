@@ -69,7 +69,5 @@ sort -u "$PENDING_SYNC" /tmp/sync_failed.list -o "$PENDING_SYNC"
 # BORE（默认关闭，BORE_ENABLE=true 才应用）
 bash "$GITHUB_WORKSPACE/scripts/features/bore.sh"
 
-# Kcompressd（默认关闭，KCOMPRESSD_ENABLE=true 才应用）
-bash "$GITHUB_WORKSPACE/scripts/features/kcompressd.sh"
 # WildKernels 额外小补丁（默认启用）
 bash "$GITHUB_WORKSPACE/scripts/features/wild_extra.sh"
