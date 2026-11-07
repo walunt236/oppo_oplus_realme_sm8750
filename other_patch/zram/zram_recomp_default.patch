@@ -1,0 +1,153 @@
+--- a/drivers/block/zram/zram_drv.h
++++ b/drivers/block/zram/zram_drv.h
+@@ -103,3 +103,5 @@ struct zram {
+ 	struct gendisk *disk;
++	/* 自动冷数据重压缩周期任务（标记 idle 页并转次级算法 zstd） */
++	struct delayed_work auto_recomp_work;
+ 	/* Prevent concurrent execution of device init */
+ 	struct rw_semaphore init_lock;
+
+--- a/drivers/block/zram/zram_drv.c
++++ b/drivers/block/zram/zram_drv.c
+@@ -18,5 +18,8 @@
+ #include <linux/module.h>
+ #include <linux/kernel.h>
+ #include <linux/bio.h>
+ #include <linux/bitops.h>
++#include <linux/workqueue.h>
++#include <linux/psi.h>
++#include <linux/math64.h>
+ #include <linux/blkdev.h>
+@@ -2040,4 +2041,6 @@ static void zram_reset_device(struct zram *zram)
+ 
+ 	comp_algorithm_set(zram, ZRAM_PRIMARY_COMP, default_compressor);
++	/* reset 会经 zram_destroy_comps 清空 SECONDARY，此处恢复默认 zstd */
++	comp_algorithm_set(zram, ZRAM_SECONDARY_COMP, kstrdup("zstd", GFP_KERNEL));
+ 	up_write(&zram->init_lock);
+ }
+@@ -2037,1 +2046,96 @@ static int zram_add(void)
++/* 自动冷数据重压缩：周期标记 idle 页并用次级算法（zstd）重压缩 */
++#define ZRAM_AUTO_RECOMP_INTERVAL	(30 * HZ)
++#define ZRAM_AUTO_RECOMP_IDLE_MS	60000
++/* 压缩后小于该阈值的页重压收益低（小页），跳过以省 CPU（官方 threshold= 语义） */
++#define ZRAM_AUTO_RECOMP_THRESHOLD	(2 * 1024)
++/* 每周期最多重压页数：防一次遍历全部页的 CPU 突增（官方 max_pages= 语义） */
++#define ZRAM_AUTO_RECOMP_MAX_PAGES	50000
++/* 智能调度：zram 使用率阈值（千分比）与 PSI 内存压力（memory.some 10s，0-10000） */
++#define ZRAM_AUTO_RECOMP_USAGE_MID	500
++#define ZRAM_AUTO_RECOMP_USAGE_HIGH	800
++#define ZRAM_AUTO_RECOMP_PSI_HIGH	6000
++#define ZRAM_AUTO_RECOMP_INTERVAL_SHORT	(15 * HZ)
++#define ZRAM_AUTO_RECOMP_INTERVAL_LONG	(60 * HZ)
++
++static void zram_auto_recompress_work(struct work_struct *work)
++{
++	struct zram *zram = container_of(work, struct zram, auto_recomp_work.work);
++	unsigned long index, nr_pages;
++	struct page *page;
++	u32 prio = ZRAM_SECONDARY_COMP, prio_max = ZRAM_MAX_COMPS;
++	unsigned int recomped = 0, huge_count = 0;
++	unsigned long interval = ZRAM_AUTO_RECOMP_INTERVAL;
++	u64 mem_used;
++	u32 usage, psi_some;
++	bool do_recompress = true;
++
++	down_read(&zram->init_lock);
++	if (!init_done(zram) || !zram->comp_algs[ZRAM_SECONDARY_COMP])
++		goto out;
++
++	/* 智能调度信号：zram 使用率 + PSI 内存压力（memory.some 10s 平均） */
++	mem_used = (u64)zs_get_total_pages(zram->mem_pool) << PAGE_SHIFT;
++	psi_some = psi_system.avg[PSI_MEM_SOME][0];
++	usage = zram->disksize ? div64_u64(mem_used * 1000, zram->disksize) : 0;
++
++	if (usage < ZRAM_AUTO_RECOMP_USAGE_MID &&
++	    psi_some < ZRAM_AUTO_RECOMP_PSI_HIGH) {
++		/* 低使用率且无内存压力：跳过重压缩，延长周期省 CPU */
++		interval = ZRAM_AUTO_RECOMP_INTERVAL_LONG;
++		do_recompress = false;
++	} else if (usage >= ZRAM_AUTO_RECOMP_USAGE_HIGH ||
++		   psi_some >= ZRAM_AUTO_RECOMP_PSI_HIGH) {
++		/* 高使用率或高压力：缩短周期持续追 */
++		interval = ZRAM_AUTO_RECOMP_INTERVAL_SHORT;
++	}
++
++	/* 标记 60 秒未访问的页为冷数据 */
++	mark_idle(zram, ktime_sub(ktime_get(), ms_to_ktime(ZRAM_AUTO_RECOMP_IDLE_MS)));
++
++	if (do_recompress) {
++		nr_pages = zram->disksize >> PAGE_SHIFT;
++		page = alloc_page(GFP_KERNEL);
++		if (!page)
++			goto out;
++
++		for (index = 0; index < nr_pages; index++) {
++			int err = 0;
++
++			zram_slot_lock(zram, index);
++			if (!zram_allocated(zram, index) ||
++			    !zram_test_flag(zram, index, ZRAM_IDLE) ||
++			    zram_test_flag(zram, index, ZRAM_WB) ||
++			    zram_test_flag(zram, index, ZRAM_UNDER_WB) ||
++			    zram_test_flag(zram, index, ZRAM_SAME) ||
++			    zram_test_flag(zram, index, ZRAM_INCOMPRESSIBLE))
++				goto next;
++			/* 跳过压缩后过小的页（重压收益低于 CPU 成本） */
++			if (zram_get_obj_size(zram, index) < ZRAM_AUTO_RECOMP_THRESHOLD)
++				goto next;
++			/* idle+huge 页统计（不可压缩观测数据） */
++			if (zram_test_flag(zram, index, ZRAM_HUGE))
++				huge_count++;
++
++			err = zram_recompress(zram, index, page, 0, prio, prio_max);
++next:
++			zram_slot_unlock(zram, index);
++			if (err)
++				break;
++			/* 每周期限页：防一次遍历全部页的 CPU 突增 */
++			if (++recomped >= ZRAM_AUTO_RECOMP_MAX_PAGES)
++				break;
++			cond_resched();
++		}
++		__free_page(page);
++
++		/* 重压缩释放的页产生 zsmalloc 碎片，顺带回收 */
++		zs_compact(zram->mem_pool);
++	}
++	pr_info("zram: auto-recomp usage=%u/1000 psi=%u recomped=%u huge=%u\n",
++		usage, psi_some, recomped, huge_count);
++out:
++	up_read(&zram->init_lock);
++	schedule_delayed_work(&zram->auto_recomp_work, interval);
++}
++
+ static int zram_add(void)
+@@ -2042,5 +2091,9 @@ static int zram_add(void)
+ 
+ 	comp_algorithm_set(zram, ZRAM_PRIMARY_COMP, default_compressor);
+ 
++	/* 默认注册 zstd 为冷数据重压缩算法（recomp_algorithm 只能在设备 init 前配置，
++	 * Android 用户态无法在 swapon 前介入，故在设备创建时固化） */
++	comp_algorithm_set(zram, ZRAM_SECONDARY_COMP, kstrdup("zstd", GFP_KERNEL));
++
+ 	/* Actual capacity set using sysfs (/sys/block/zram<id>/disksize */
+ 	set_capacity(zram->disk, 0);
+@@ -2056,4 +2105,6 @@ static int zram_add(void)
+ 
+ 	zram_debugfs_register(zram);
++	INIT_DELAYED_WORK(&zram->auto_recomp_work, zram_auto_recompress_work);
++	schedule_delayed_work(&zram->auto_recomp_work, ZRAM_AUTO_RECOMP_INTERVAL);
+ 	pr_info("Added device: %s\n", zram->disk->disk_name);
+ 	return device_id;
+@@ -2308,4 +2357,6 @@ static int zram_remove(struct zram *zram)
+ 
+ 	zram_debugfs_unregister(zram);
+ 
++	cancel_delayed_work_sync(&zram->auto_recomp_work);
++
+ 	if (claimed) {
+--- a/include/linux/zstd_lib.h
++++ b/include/linux/zstd_lib.h
+@@ -113,1 +113,1 @@
+-#  define ZSTD_CLEVEL_DEFAULT 3
++#  define ZSTD_CLEVEL_DEFAULT 6
