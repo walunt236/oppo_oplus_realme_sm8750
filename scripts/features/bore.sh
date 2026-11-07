@@ -16,11 +16,10 @@ if grep -q "FAILED" /tmp/bore.log; then
   echo "[BORE] 有 hunk 失败："
   grep -E "FAILED|Hunk" /tmp/bore.log | head -5
 fi
-# 默认 0：开机后由 qcom_opt service 启用（此路径已实测可开机）
-# 注：默认 1 的早期初始化路径在 #108/#110 卡一屏，待单独验证
-if [ -f kernel/sched/bore.c ] && grep -q "sched_bore.*= 1;" kernel/sched/bore.c; then
-  sed -i "s/^\(u8 \+__read_mostly \+sched_bore \+=\) 1;/\1 0;/" kernel/sched/bore.c
-  echo "[BORE] sched_bore 默认值改为 0（服务启动后启用）"
+# 完全体：sched_bore=1，开机即接管（用户确认此默认可开机）
+if [ -f kernel/sched/bore.c ] && grep -q "sched_bore.*= 0;" kernel/sched/bore.c; then
+  sed -i "s/^\(u8 \+__read_mostly \+sched_bore \+=\) 0;/\1 1;/" kernel/sched/bore.c
+  echo "[BORE] sched_bore 默认值改为 1（完全体）"
 fi
 
 # 修复：补丁漏加 include 的文件（core.c / debug.c）
