@@ -1,9 +1,6 @@
 #!/usr/bin/env python3
-"""BORE 补丁兜底修正：CachyOS 6.6 补丁在 OEM fair.c 上会有 3 个 hunk 打不上。
-本脚本做幂等修正：
-  1) 补 include <linux/sched/bore.h>
-  2) 补 BORE 基础片定义（nsecs_per_tick / sysctl_sched_min_base_slice）
-  3) 补 __pick_eevdf 的 burst parity 判断
+"""BORE 补丁兜底修正（v2）：CachyOS 6.6 补丁在 OEM fair.c 上会有 3 个 hunk 打不上。
+v2 修正：改为检查“定义”而不是“出现”，避免使用处误判。
 """
 import re
 import sys
@@ -13,16 +10,14 @@ s = open(p, encoding="utf-8").read()
 changed = []
 
 # 1) include
-if "linux/sched/bore.h" not in s:
+if "#include <linux/sched/bore.h>" not in s:
     anchor = '#include "autogroup.h"'
     if anchor in s:
         s = s.replace(anchor, anchor + "\n\n#include <linux/sched/bore.h>", 1)
         changed.append("include")
-    else:
-        print("FIXUP: include anchor MISS")
 
-# 2) 基础片定义
-if "nsecs_per_tick" not in s:
+# 2) 基础片定义：检查定义（= 号），不是使用
+if not re.search(r"nsecs_per_tick\s*=", s):
     old_re = re.compile(
         r"unsigned int sysctl_sched_base_slice\s*=\s*700000ULL;\n"
         r"EXPORT_SYMBOL_GPL\(sysctl_sched_base_slice\);\n"
@@ -47,7 +42,7 @@ if "nsecs_per_tick" not in s:
         print("FIXUP: base-slice anchor MISS")
 
 # 3) RUN_TO_PARITY
-if "sched_burst_parity_threshold" not in s:
+if not re.search(r"sched_burst_parity_threshold\s*<\s*cfs_rq->nr_running", s):
     old = ("\tif (sched_feat(RUN_TO_PARITY) && curr && curr->vlag == curr->deadline)\n"
            "\t\treturn curr;")
     new = ("\tif (sched_feat(RUN_TO_PARITY) && curr && curr->vlag == curr->deadline)\n"
@@ -63,4 +58,4 @@ if "sched_burst_parity_threshold" not in s:
         print("FIXUP: RUN_TO_PARITY anchor MISS")
 
 open(p, "w", encoding="utf-8").write(s)
-print("BORE fixup: " + (", ".join(changed) if changed else "nothing to do"))
+print("BORE fixup v2: " + (", ".join(changed) if changed else "nothing to do"))
