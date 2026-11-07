@@ -85,6 +85,30 @@ else
   fi
 fi
 
+# 兜底：mmzone.h 字段 hunk 若失败，用 Python 精确补齐（幂等）
+if ! grep -qF "kcompress_fifo" include/linux/mmzone.h 2>/dev/null; then
+  warn "[KCOMPRESSD] mmzone.h 字段缺失，尝试 Python 兜底插入"
+  python3 - <<'PYEOF'
+p = "include/linux/mmzone.h"
+s = open(p, encoding="utf-8").read()
+if "kcompress_fifo" not in s:
+    if "struct kfifo;" not in s:
+        s = s.replace("#include <asm/page.h>", "#include <asm/page.h>\n\nstruct kfifo;", 1)
+    fields = ("\n#define KCOMPRESS_FIFO_SIZE 256\n"
+              "\twait_queue_head_t kcompressd_wait;\n"
+              "\tstruct task_struct *kcompressd;\n"
+              "\tstruct kfifo *kcompress_fifo;\n"
+              "\tspinlock_t kcompress_fifo_lock;\n")
+    idx = s.rfind("} pg_data_t;")
+    if idx > 0:
+        s = s[:idx] + fields + s[idx:]
+        open(p, "w", encoding="utf-8").write(s)
+        print("inserted")
+    else:
+        print("anchor-not-found")
+PYEOF
+fi
+
 missing="$(missing_markers)"
 if [[ -z "$missing" ]]; then
   info "[KCOMPRESSD] 幂等校验通过：${#MARKERS[@]} 处标识齐全"
