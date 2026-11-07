@@ -94,11 +94,6 @@ on:
         required: false
         type: boolean
         default: false
-      kcompressd_enable:
-        description: 'Kcompressd 压缩异步化（6.6 回移，实验）'
-        required: false
-        type: boolean
-        default: false
       libbpf_enable:
         description: 'libbpf兼容修正'
         required: true
@@ -178,7 +173,6 @@ jobs:
       F2FS_ENABLE: ${{ inputs.f2fs_enable }}
       LIBBPF_ENABLE: ${{ inputs.libbpf_enable }}
       BORE_ENABLE: ${{ inputs.bore_enable }}
-      KCOMPRESSD_ENABLE: ${{ inputs.kcompressd_enable }}
       RCU_NOCB_ENABLE: ${{ inputs.rcu_nocb_enable }}
       CCACHE_DEBUG_INPUT: ${{ inputs.ccache_debug }}
       KERNEL_SUFFIX_INPUT: ${{ inputs.kernel_suffix }}
