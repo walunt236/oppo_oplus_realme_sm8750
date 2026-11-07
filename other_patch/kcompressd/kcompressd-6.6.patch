@@ -10,11 +10,7 @@ diff --git a/include/linux/mmzone.h b/include/linux/mmzone.h
  
  /* Free memory management - zoned buddy allocator.  */
  #ifndef CONFIG_ARCH_FORCE_MAX_ORDER
-@@ -1451,6 +1451,12 @@
- #ifdef CONFIG_MEMORY_FAILURE
- 	struct memory_failure_stats mf_stats;
- #endif
- 
+@@ -1455,2 +1455,8 @@
  	ANDROID_KABI_RESERVE(1);
 +
 +#define KCOMPRESS_FIFO_SIZE 256
