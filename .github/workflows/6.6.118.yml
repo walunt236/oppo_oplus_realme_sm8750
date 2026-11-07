@@ -59,6 +59,41 @@ on:
         required: true
         type: boolean
         default: false
+      adios_enable:
+        description: '集成ADIOS I/O调度器'
+        required: true
+        type: boolean
+        default: true
+      nvhe_enable:
+        description: 'KVM NVHE AutoFDO兼容'
+        required: true
+        type: boolean
+        default: true
+      bbr3_enable:
+        description: '集成BBRv3'
+        required: true
+        type: boolean
+        default: true
+      sched_enable:
+        description: '调度器优化'
+        required: true
+        type: boolean
+        default: true
+      lz4zstd_enable:
+        description: '集成lz4/zstd'
+        required: true
+        type: boolean
+        default: true
+      f2fs_enable:
+        description: 'f2fs优化'
+        required: true
+        type: boolean
+        default: true
+      libbpf_enable:
+        description: 'libbpf兼容修正'
+        required: true
+        type: boolean
+        default: true
       rcu_nocb_enable:
         description: 'RCU_NOCB_CPU'
         required: true
@@ -125,6 +160,13 @@ jobs:
       DROIDSPACES_ENABLE: ${{ inputs.droidspaces_enable }}
       REKERNEL_ENABLE: ${{ inputs.rekernel_enable }}
       BASEBAND_GUARD: ${{ inputs.baseband_guard }}
+      ADIOS_ENABLE: ${{ inputs.adios_enable }}
+      NVHE_ENABLE: ${{ inputs.nvhe_enable }}
+      BBR3_ENABLE: ${{ inputs.bbr3_enable }}
+      SCHED_ENABLE: ${{ inputs.sched_enable }}
+      LZ4ZSTD_ENABLE: ${{ inputs.lz4zstd_enable }}
+      F2FS_ENABLE: ${{ inputs.f2fs_enable }}
+      LIBBPF_ENABLE: ${{ inputs.libbpf_enable }}
       RCU_NOCB_ENABLE: ${{ inputs.rcu_nocb_enable }}
       CCACHE_DEBUG_INPUT: ${{ inputs.ccache_debug }}
       KERNEL_SUFFIX_INPUT: ${{ inputs.kernel_suffix }}
