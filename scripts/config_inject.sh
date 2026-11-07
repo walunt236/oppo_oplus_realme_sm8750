@@ -286,8 +286,10 @@ echo "CONFIG_PER_VMA_LOCK_STATS=y" >> ./common/arch/arm64/configs/gki_defconfig
 # 均可通过启动参数恢复（init_on_alloc=1 / page_alloc.shuffle=1）。
 echo "# CONFIG_INIT_ON_ALLOC_DEFAULT_ON is not set" >> "$DCFG"
 echo "# CONFIG_SHUFFLE_PAGE_ALLOCATOR is not set" >> "$DCFG"
+# 帧指针：去掉 x29 的 prologue/epilogue 开销，释放一个通用寄存器（代价：崩溃栈回溯变差）
+echo "# CONFIG_FRAME_POINTER is not set" >> "$DCFG"
 
-info "已关闭 INIT_ON_ALLOC / SHUFFLE_PAGE_ALLOCATOR（性能优先）"
+info "已关闭 INIT_ON_ALLOC / SHUFFLE_PAGE_ALLOCATOR / FRAME_POINTER（性能优先）"
 
 
 info "配置注入完成"
