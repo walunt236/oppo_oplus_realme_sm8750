@@ -107,9 +107,11 @@ if [[ "$DROIDSPACES_ENABLE" != "false" ]]; then
   fi
 fi
 
-# ADIOS 配置块
-cd "$GITHUB_WORKSPACE/kernel_workspace"
-cat "$GITHUB_WORKSPACE/configs/features/adios.config" >> "$DCFG"
+# ADIOS 配置块（ADIOS_ENABLE=false 时不注入）
+if [[ "${ADIOS_ENABLE:-true}" == "true" ]]; then
+  cd "$GITHUB_WORKSPACE/kernel_workspace"
+  cat "$GITHUB_WORKSPACE/configs/features/adios.config" >> "$DCFG"
+fi
 
 # 版本固化
 cd "$GITHUB_WORKSPACE/kernel_workspace"
