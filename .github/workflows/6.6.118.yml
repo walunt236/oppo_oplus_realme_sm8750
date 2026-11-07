@@ -94,11 +94,6 @@ on:
         required: false
         type: boolean
         default: false
-      wild_extra_enable:
-        description: 'WildKernels 额外小补丁（调度/内存对齐）'
-        required: false
-        type: boolean
-        default: true
       kcompressd_enable:
         description: 'Kcompressd 压缩异步化（6.6 回移，实验）'
         required: false
@@ -184,7 +179,6 @@ jobs:
       LIBBPF_ENABLE: ${{ inputs.libbpf_enable }}
       BORE_ENABLE: ${{ inputs.bore_enable }}
       KCOMPRESSD_ENABLE: ${{ inputs.kcompressd_enable }}
-      WILD_EXTRA_ENABLE: ${{ inputs.wild_extra_enable }}
       RCU_NOCB_ENABLE: ${{ inputs.rcu_nocb_enable }}
       CCACHE_DEBUG_INPUT: ${{ inputs.ccache_debug }}
       KERNEL_SUFFIX_INPUT: ${{ inputs.kernel_suffix }}
