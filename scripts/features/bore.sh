@@ -22,18 +22,28 @@ if [ -f kernel/sched/bore.c ] && grep -q "sched_bore.*= 1;" kernel/sched/bore.c;
   echo "[BORE] sched_bore 默认值改为 0"
 fi
 
-# 修复：core.c 调用 effective_prio_bore/sched_init_bore，但补丁没给它加 include
+# 修复：补丁漏加 include 的文件（core.c / debug.c）
 python3 - << 'PYEOF'
-p = "kernel/sched/core.c"
-s = open(p, encoding="utf-8").read()
-if "linux/sched/bore.h" not in s and "effective_prio_bore" in s:
-    anchor = '#include "sched.h"'
-    if anchor in s:
-        s = s.replace(anchor, "#include <linux/sched/bore.h>\n" + anchor, 1)
-        open(p, "w", encoding="utf-8").write(s)
-        print("[BORE] core.c 已补 include")
+import sys
+files = ["kernel/sched/core.c", "kernel/sched/debug.c"]
+syms = ("effective_prio_bore", "bore_score", "sched_init_bore")
+anchors = ['#include "sched.h"', '#include "sched/debug.h"', '#include <linux/sched.h>']
+for p in files:
+    try:
+        s = open(p, encoding="utf-8").read()
+    except FileNotFoundError:
+        continue
+    if "linux/sched/bore.h" in s:
+        continue
+    if not any(k in s for k in syms):
+        continue
+    for a in anchors:
+        if a in s:
+            s = s.replace(a, "#include <linux/sched/bore.h>\n" + a, 1)
+            open(p, "w", encoding="utf-8").write(s)
+            print("[BORE] %s 已补 include" % p)
+            break
     else:
-        print("[BORE] core.c 未找到 sched.h 锚点")
+        print("[BORE] %s 未找到 include 锚点" % p)
 PYEOF
-
 echo "[BORE] 完成"
