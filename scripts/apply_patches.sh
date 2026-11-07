@@ -135,9 +135,11 @@ ZRAM_CACHE_DIR="$HOME/.cache_patches/zram_patches"
 SUKI_CACHE_DIR="$HOME/.cache_patches/sukisu_patches"
 WILD_DIR="$HOME/.cache_patches/wild_patches"
 mkdir -p "$HOME/.cache_patches"
+export SUSFS_CACHE_DIR ZRAM_CACHE_DIR SUKI_CACHE_DIR WILD_DIR
 
 if [[ "$SUSFS_ENABLE" == "true" && "$KSU_TYPE" != "none" ]]; then
   SUSFS_BRANCH="${SUSFS_BRANCH:-gki-${QCOM_SERIES:-android15-6.6}}"
+  export SUSFS_BRANCH
   sync_repo "https://github.com/ShirkNeko/susfs4ksu.git" "$SUSFS_CACHE_DIR" "$SUSFS_BRANCH" || true &
 fi
 sync_repo "https://github.com/mrcxlinux/kernel_patches.git" "$ZRAM_CACHE_DIR" || true &
@@ -170,83 +172,8 @@ if [[ "$LZ4KD_ENABLE" == "true" ]] && [ ! -d "$SUKI_CACHE_DIR/.git" ]; then
 fi
 info "补丁仓并行预取完成"
 
-# SUSFS
-if [[ "$SUSFS_ENABLE" == "true" ]]; then
-  if [[ "$KSU_TYPE" != "none" ]]; then
-    cd "$GITHUB_WORKSPACE/kernel_workspace"
-    info "添加 susfs 补丁..."
-
-    rm -rf susfs4ksu
-    cp -r "$SUSFS_CACHE_DIR" susfs4ksu
-
-    cp "$GITHUB_WORKSPACE/other_patch/ksu/69_hide_stuff.patch" ./common/69_hide_stuff.patch
-
-    cp ./susfs4ksu/kernel_patches/50_add_susfs_in_${SUSFS_BRANCH}.patch ./common/
-    cp ./susfs4ksu/kernel_patches/fs/* ./common/fs/
-    cp ./susfs4ksu/kernel_patches/include/linux/* ./common/include/linux/
-
-    cd ./common
-
-    sed -i -e '/int ret = 0, copied = 0;/a \    unsigned int nr_subpages = __PAGE_SIZE / PAGE_SIZE;' -e '/int ret = 0, copied = 0;/a \    pagemap_entry_t *res = NULL;' ./fs/proc/task_mmu.c || true
-
-    patch -p1 < 50_add_susfs_in_${SUSFS_BRANCH}.patch || {
-      sed -i '/^    unsigned int nr_subpages = __PAGE_SIZE \/ PAGE_SIZE;$/d; /^    pagemap_entry_t \*res = NULL;$/d' ./fs/proc/task_mmu.c || true
-      error "SUSFS 核心补丁应用失败"
-      exit 1
-    }
-
-    sed -i '/^    unsigned int nr_subpages = __PAGE_SIZE \/ PAGE_SIZE;$/d; /^    pagemap_entry_t \*res = NULL;$/d' ./fs/proc/task_mmu.c || true
-
-    patch -p1 -N -F 3 < 69_hide_stuff.patch > /tmp/hide.log 2>&1 || true
-    if grep -q 'show_vma_header_prefix_fake' ./fs/proc/task_mmu.c 2>/dev/null; then
-      info "隐藏 VMA 功能已生效"
-    else
-      warn "69_hide_stuff 补丁未生效（明细 /tmp/hide.log）"
-    fi
-    cd ..
-  else
-    info "跳过 susfs 配置（未选择 KernelSU）"
-  fi
-
-  if [[ "$KSU_TYPE" == "ksu" ]]; then
-    info "为原版 KernelSU 添加补丁..."
-    cp ./susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./KernelSU/ || warn "susfs-ksu 补丁文件缺失，跳过补丁应用"
-    cd ./KernelSU
-    patch -p1 < 10_enable_susfs_for_ksu.patch > /tmp/susfs_ksu.log 2>&1 || true
-    REJ_N=$(find . -name "*.rej" 2>/dev/null | wc -l)
-    if grep -rqs 'susfs' kernel/Kconfig 2>/dev/null; then
-      if [ "$REJ_N" -eq 0 ]; then
-        info "SUSFS ↔ KernelSU 集成已生效"
-      else
-        # 上游补丁常滞后于 KernelSU main；实测带少量 reject 仍可正常编译。
-        warn "SUSFS ↔ KernelSU 集成已生效，但有 ${REJ_N} 个 hunk 未应用（上游补丁滞后于 main）"
-      fi
-    else
-      warn "susfs-ksu 集成补丁未生效（明细 /tmp/susfs_ksu.log）"
-    fi
-
-    # 上游补丁按旧版 reset_avc_cache(u32) 写的上下文，在 main 上该 hunk 必然 reject，
-    # 结果 apply_kernelsu_rules() 里缺少 susfs_set_batch_sid() 调用。
-    # 后果：susfs_zygote_sid 恒为 0 -> is_zygote() 恒假 -> 管理器的 ksu fd 装不上
-    # -> 管理器显示"未安装"（但 su 走 execveat 钩子，正常可用）。
-    RULES_FILE=./kernel/selinux/rules.c
-    if [ -f "$RULES_FILE" ] && \
-       grep -rqs "void susfs_set_batch_sid" ./kernel/selinux/selinux.c 2>/dev/null && \
-       ! grep -q "susfs_set_batch_sid" "$RULES_FILE"; then
-      if ! grep -qs "susfs_set_batch_sid" ./kernel/selinux/selinux.h 2>/dev/null; then
-        sed -i "1i extern void susfs_set_batch_sid(void);" "$RULES_FILE"
-      fi
-      sed -i "0,/reset_avc_cache(pol->latest_granting);/s//&\n    susfs_set_batch_sid();/" "$RULES_FILE"
-      if grep -q "susfs_set_batch_sid" "$RULES_FILE"; then
-        info "已补上 susfs_set_batch_sid()：SID 初始化恢复（修复管理器未识别）"
-      else
-        warn "susfs_set_batch_sid() 补写失败，管理器可能仍显示未安装"
-      fi
-    else
-      info "susfs_set_batch_sid() 已存在，无需补写"
-    fi
-  fi
-fi
+# SUSFS：补丁/隐藏（模块化；预取同步与 release 对齐仍在主脚本）
+bash "$GITHUB_WORKSPACE/scripts/features/susfs.sh"
 
 # lz4/zstd
 cd "$GITHUB_WORKSPACE/kernel_workspace/common"
@@ -313,22 +240,7 @@ else
 fi
 
 # lz4kd
-if [[ "$LZ4KD_ENABLE" == "true" ]]; then
-  cd "$GITHUB_WORKSPACE/kernel_workspace/common"
-
-  cp -r "$SUKI_CACHE_DIR/other/zram/lz4k/include/linux/"* ./include/linux/
-  cp -r "$SUKI_CACHE_DIR/other/zram/lz4k/lib/"* ./lib/
-  cp -r "$SUKI_CACHE_DIR/other/zram/lz4k/crypto/"* ./crypto/
-  cp "$SUKI_CACHE_DIR/other/zram/zram_patch/6.6/lz4kd.patch" ./
-  patch -p1 -F 3 < lz4kd.patch || true
-
-  if [ -f crypto/lz4kd.c ] && [ -f lib/lz4kd/lz4kd_decode.c ] && grep -q 'lz4kd' crypto/Makefile && grep -q 'lz4kd' lib/Makefile; then
-    info "LZ4KD 补丁生效 (crypto/lz4kd.c + lib/lz4kd/ 已就位)"
-  else
-    error "LZ4KD 补丁未生效，中止构建"
-    exit 1
-  fi
-fi
+bash "$GITHUB_WORKSPACE/scripts/features/lz4kd.sh"
 
 # 风驰引擎已移除（它是对 sched_ext 的魔改替换；而 sched_ext 在 6.6 QCOM 树上不可用：
 # ext.o 已从 Makefile 移除且 task_struct 缺 sched_ext_entity）。以下为 HMBIRD 的内存/IO 调优补丁。
@@ -433,28 +345,7 @@ else
 fi
 
 # Droidspaces
-if [[ "$DROIDSPACES_ENABLE" != "false" ]]; then
-  info "启用 Droidspaces 容器支持..."
-  cd "$GITHUB_WORKSPACE/kernel_workspace"
-  apply_patch_file "other_patch/droidspaces/fix_sysvipc_kabi_6_7_8.patch" /tmp/fix_sysvipc.patch nonstrict "fix_sysvipc_kabi 补丁"
-  apply_patch_file "other_patch/droidspaces/fix_oplus_bsp_midas.patch" /tmp/fix_midas.patch nonstrict "fix_oplus_bsp_midas 补丁"
-  cp "$GITHUB_WORKSPACE/other_patch/droidspaces/ntsync_base.patch" /tmp/ntsync_base.patch
-  if cp "$GITHUB_WORKSPACE/other_patch/droidspaces/ntsync_compat_android15-$KERNEL_VERSION.patch" /tmp/ntsync_compat.patch; then
-    ( cd ./common && patch -p1 -F 3 < /tmp/ntsync_base.patch > /tmp/ntsync.log 2>&1 ) || true
-    ( cd ./common && patch -p1 -F 3 < /tmp/ntsync_compat.patch >> /tmp/ntsync.log 2>&1 ) || true
-    if [ -f ./common/drivers/misc/ntsync.c ]; then
-      info "ntsync 已就位（Wine/Proton 同步原语）"
-    else
-      warn "ntsync 补丁未生效（明细 /tmp/ntsync.log）"
-    fi
-  else
-    warn "ntsync compat 补丁拉取失败，跳过（仅 base 已应用）"
-    ( cd ./common && patch -p1 -F 3 < /tmp/ntsync_base.patch ) || true
-  fi
-  if [[ "$DROIDSPACES_ENABLE" == "extend" ]]; then
-    apply_patch_file "other_patch/droidspaces/evdi_drm.patch" /tmp/evdi_drm.patch nonstrict "evdi_drm 补丁"
-  fi
-fi
+bash "$GITHUB_WORKSPACE/scripts/features/droidspaces.sh"
 
 # ADIOS
 info "启用 ADIOS I/O 调度器..."
@@ -527,55 +418,11 @@ done
 
 info "调度器优化完成 (PELT 32ms 上游默认 / NEXT_BUDDY / HRTICK / SIS_PROP / CACHE_HOT_BUDDY / LB_MIN)"
 
-# f2fs：默认启用 ATGC（年龄阈值 GC）与 GC_MERGE（GC 写合并）
-# 两者在 6.6.143 里已存在，但只能通过挂载参数开启；而挂载参数由 ROM 的 fstab 决定。
-# 这里在 default_options() 之后、解析挂载参数之前打开，ROM 显式传 nogc_merge 仍可覆盖。
-F2FS_ATGC_PATCH='" + D + "GITHUB_WORKSPACE/other_patch/f2fs/f2fs_default_atgc_gcmerge.patch'
-if [ -f "$F2FS_ATGC_PATCH" ]; then
-  if patch -p1 --forward -F 3 < "$F2FS_ATGC_PATCH" >/dev/null 2>&1; then
-    info "f2fs ATGC / GC_MERGE 默认值已启用"
-  else
-    warn "f2fs ATGC / GC_MERGE 补丁应用失败（继续构建）"
-  fi
-fi
-if grep -q 'set_opt(sbi, ATGC);' fs/f2fs/super.c 2>/dev/null && \
-   grep -q 'set_opt(sbi, GC_MERGE);' fs/f2fs/super.c 2>/dev/null; then
-  info "f2fs ATGC / GC_MERGE 校验通过"
-else
-  warn "f2fs ATGC / GC_MERGE 未生效，GC 行为与上游一致"
-fi
+# f2fs：ATGC/GC_MERGE 默认值 + GC 三项调优（模块化）
+bash "$GITHUB_WORKSPACE/scripts/features/f2fs.sh"
 
-# f2fs GC 三项调优：紧急休眠 500→50ms、拥塞超时 20→6ms、fsync 批量 8→20
-# 来源 WildKernels/kernel_patches，均已验证适用于 6.6.143
-F2FS_GC_TUNING="$GITHUB_WORKSPACE/other_patch/f2fs/f2fs_gc_tuning.patch"
-if [ -f "$F2FS_GC_TUNING" ]; then
-  patch -p1 --forward -F 3 < "$F2FS_GC_TUNING" > /tmp/f2fs_gc_tuning.log 2>&1 || true
-fi
-if grep -q 'DEF_GC_THREAD_URGENT_SLEEP_TIME.50' fs/f2fs/gc.h 2>/dev/null && \
-   grep -q 'msecs_to_jiffies(6)' fs/f2fs/f2fs.h 2>/dev/null && \
-   grep -q 'DEF_MIN_FSYNC_BLOCKS.20' fs/f2fs/segment.h 2>/dev/null; then
-  info "f2fs GC 调优已生效（紧急休眠 50ms / 拥塞 6ms / fsync 批量 20）"
-else
-  warn "f2fs GC 调优未完全生效"
-  grep -E 'FAILED|rej' /tmp/f2fs_gc_tuning.log 2>/dev/null | head -3 || true
-fi
-
-# 新 glibc（如 26.04 的 2.42）下 strchr() 对 const 参数返回 const char*，
-# 会与内核自带 -Werror 冲突，导致 resolve_btfids 编译失败。
-LIBBPF="$GITHUB_WORKSPACE/kernel_workspace/common/tools/lib/bpf/libbpf.c"
-# 自愈：旧版补丁在 6.6.14x 上会产生 const const
-if grep -qE 'const const char \*next_path;' "$LIBBPF" 2>/dev/null; then
-  sed -i 's/const const char \*next_path;/const char *next_path;/' "$LIBBPF"
-  info "libbpf const 重复声明已修正"
-fi
-if grep -qE '^[[:space:]]*char \*next_path;' "$LIBBPF" 2>/dev/null; then
-  sed -i 's/^[[:space:]]*char \*next_path;/const char *next_path;/' "$LIBBPF"
-  info "libbpf const 补丁已应用（新 glibc 兼容）"
-elif grep -qE '^[[:space:]]*const char \*next_path;' "$LIBBPF" 2>/dev/null; then
-  info "libbpf 已是 const 声明（上游已修），跳过该补丁"
-else
-  warn "libbpf next_path 声明未找到，跳过"
-fi
+# libbpf：新 glibc 下 strchr() const 兼容修正（模块化）
+bash "$GITHUB_WORKSPACE/scripts/features/libbpf.sh"
 
 touch /tmp/sync_failed.list "$PENDING_SYNC"
 sort -u "$PENDING_SYNC" /tmp/sync_failed.list -o "$PENDING_SYNC"
