@@ -288,6 +288,12 @@ echo "# CONFIG_INIT_ON_ALLOC_DEFAULT_ON is not set" >> "$DCFG"
 echo "# CONFIG_SHUFFLE_PAGE_ALLOCATOR is not set" >> "$DCFG"
 # 帧指针：去掉 x29 的 prologue/epilogue 开销，释放一个通用寄存器（代价：崩溃栈回溯变差）
 echo "# CONFIG_FRAME_POINTER is not set" >> "$DCFG"
+# arm64 架构在 arch/arm64/Kconfig 里无条件 select FRAME_POINTER，
+# 必须去掉这两行 select，defconfig 的关闭才会生效
+if grep -qE "^[[:space:]]+select[[:space:]]+FRAME_POINTER[[:space:]]*$" ./common/arch/arm64/Kconfig 2>/dev/null; then
+  sed -i -E "/^[[:space:]]+select[[:space:]]+(ARCH_WANT_FRAME_POINTERS|FRAME_POINTER)[[:space:]]*$/d" ./common/arch/arm64/Kconfig
+  info "已移除 arch/arm64/Kconfig 的 FRAME_POINTER 强制 select"
+fi
 
 info "已关闭 INIT_ON_ALLOC / SHUFFLE_PAGE_ALLOCATOR / FRAME_POINTER（性能优先）"
 
