@@ -581,7 +581,7 @@ touch /tmp/sync_failed.list "$PENDING_SYNC"
 sort -u "$PENDING_SYNC" /tmp/sync_failed.list -o "$PENDING_SYNC"
 
 # ---- BORE 调度器（实验：验证 6.6 补丁编译与 ABI）----
-if [[ "${BORE_ENABLE:-true}" == "true" ]]; then
+if [[ "${BORE_ENABLE:-false}" == "true" ]]; then
   BORE_PATCH="$GITHUB_WORKSPACE/other_patch/bore-6.6.patch"
   if [ -f "$BORE_PATCH" ]; then
     info "应用 BORE 调度器补丁..."
