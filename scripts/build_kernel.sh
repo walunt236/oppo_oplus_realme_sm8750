@@ -170,7 +170,14 @@ export KBUILD_BUILD_HOST="ubuntu-build"
 mkdir -p "$HOME/.thinlto-cache"
 cat << 'EOF' > ld-wrapper
 #!/bin/sh
-exec ld.lld --thinlto-cache-dir="$HOME/.thinlto-cache" --thinlto-cache-policy=cache_size_bytes=4g --thinlto-jobs="$(nproc --all)" --icf=all "$@"
+# ICF 只用于最终链接；-r 部分链接不允许 ICF（ld.lld: -r and --icf may not be used together）
+ICF="--icf=all"
+for a in "$@"; do
+  case "$a" in
+    -r|--relocatable) ICF="" ;;
+  esac
+done
+exec ld.lld --thinlto-cache-dir="$HOME/.thinlto-cache" --thinlto-cache-policy=cache_size_bytes=4g --thinlto-jobs="$(nproc --all)" $ICF "$@"
 EOF
 chmod +x ld-wrapper
 
