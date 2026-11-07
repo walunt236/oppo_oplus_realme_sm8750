@@ -331,6 +331,14 @@ if [ -n "${ZRAM_TUNE_REV:-}" ] && [ -f out/vmlinux ]; then
     die "zram 调优未编入内核（$ZRAM_TUNE_REV 缺失，疑似增量构建复用了旧目标文件）"
   fi
 fi
+# BORE 调度器符号校验
+if [ -f out/vmlinux ]; then
+  if grep -aq "sched_bore" out/vmlinux; then
+    info "BORE 已编译进内核（sched_bore 符号存在）"
+  else
+    warn "BORE 未编译进内核（补丁未应用或未启用）"
+  fi
+fi
 if nm out/vmlinux 2>/dev/null | grep -q "_lz4_decompress_asm"; then
   info "_lz4_decompress_asm 符号校验通过"
 else
