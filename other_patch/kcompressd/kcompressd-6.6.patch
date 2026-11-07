@@ -41,7 +41,7 @@ diff --git a/kernel/sysctl.c b/kernel/sysctl.c
  	{ }
  };
  
-+int vm_kcompressd = 24;
++int vm_kcompressd = 0;	/* 默认关闭，运行时 echo 24 > /proc/sys/vm/kcompressd 启用 */
 +static int SYSCTL_KCOMPRESS_FIFO_SIZE = KCOMPRESS_FIFO_SIZE;
 +
  static struct ctl_table vm_table[] = {
