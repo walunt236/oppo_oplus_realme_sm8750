@@ -96,13 +96,3 @@ apply_patch_file() {
   fi
   rm -f "$log"
 }
-  if ( cd ./common && patch -p1 -F 3 < "$out" ); then
-    info "$label 应用成功"
-  elif ( cd ./common && patch -p1 -F 3 -R --dry-run < "$out" >/dev/null 2>&1 ); then
-    warn "$label 已由上游补丁覆盖（视为已应用）"
-  elif [[ "$mode" == "strict" ]]; then
-    die "$label 应用失败，中止构建"
-  else
-    warn "$label 应用失败，继续..."
-  fi
-}
