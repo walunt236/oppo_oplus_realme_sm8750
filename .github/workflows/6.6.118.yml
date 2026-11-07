@@ -89,6 +89,11 @@ on:
         required: true
         type: boolean
         default: true
+      bore_enable:
+        description: 'BORE 调度器（实验，开机默认不接管）'
+        required: false
+        type: boolean
+        default: false
       libbpf_enable:
         description: 'libbpf兼容修正'
         required: true
@@ -167,6 +172,7 @@ jobs:
       LZ4ZSTD_ENABLE: ${{ inputs.lz4zstd_enable }}
       F2FS_ENABLE: ${{ inputs.f2fs_enable }}
       LIBBPF_ENABLE: ${{ inputs.libbpf_enable }}
+      BORE_ENABLE: ${{ inputs.bore_enable }}
       RCU_NOCB_ENABLE: ${{ inputs.rcu_nocb_enable }}
       CCACHE_DEBUG_INPUT: ${{ inputs.ccache_debug }}
       KERNEL_SUFFIX_INPUT: ${{ inputs.kernel_suffix }}
