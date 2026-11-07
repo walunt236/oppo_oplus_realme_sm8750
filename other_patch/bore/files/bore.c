@@ -7,7 +7,7 @@
 #include "sched.h"
 
 #ifdef CONFIG_SCHED_BORE
-u8   __read_mostly sched_bore                   = 1;
+u8   __read_mostly sched_bore                   = 0; /* boot 默认关闭，运行时通过 sysctl 启用 */
 u8   __read_mostly sched_burst_exclude_kthreads = 1;
 u8   __read_mostly sched_burst_smoothness_long  = 1;
 u8   __read_mostly sched_burst_smoothness_short = 0;
