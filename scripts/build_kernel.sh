@@ -170,7 +170,7 @@ export KBUILD_BUILD_HOST="ubuntu-build"
 mkdir -p "$HOME/.thinlto-cache"
 cat << 'EOF' > ld-wrapper
 #!/bin/sh
-exec ld.lld --thinlto-cache-dir="$HOME/.thinlto-cache" --thinlto-cache-policy=cache_size_bytes=4g --thinlto-jobs="$(nproc --all)" "$@"
+exec ld.lld --thinlto-cache-dir="$HOME/.thinlto-cache" --thinlto-cache-policy=cache_size_bytes=4g --thinlto-jobs="$(nproc --all)" --lto-O3 "$@"
 EOF
 chmod +x ld-wrapper
 
@@ -185,6 +185,8 @@ KCFLAGS_EXTRA+=" -mllvm -unroll-threshold=300 -mllvm -enable-loop-distribute"
 # 导致运行时 trip count 的循环永不展开。命令行传入 PartialUnrollingThreshold 会走
 # 第一个分支、以相同数值 16 绕过该判断，等价于上游把模型值改成 16。
 KCFLAGS_EXTRA+=" -mllvm -partial-unrolling-threshold=16"
+# 基于 AFDO 画像的机器块布局（ext-TSP），把热块排到一起
+KCFLAGS_EXTRA+=" -mllvm -enable-ext-tsp-block-placement=1"
 
 # KSU_NO_PREINIT 兜底已移除：headers_install 后 preinit 会被编译，
 # 其符号真实存在，SUSFS 的 exec.c 钩子可以直接链接。
