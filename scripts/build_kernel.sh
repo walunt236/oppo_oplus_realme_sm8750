@@ -170,14 +170,7 @@ export KBUILD_BUILD_HOST="ubuntu-build"
 mkdir -p "$HOME/.thinlto-cache"
 cat << 'EOF' > ld-wrapper
 #!/bin/sh
-# ICF 只用于最终链接；-r 部分链接不允许 ICF（ld.lld: -r and --icf may not be used together）
-ICF="--icf=all"
-for a in "$@"; do
-  case "$a" in
-    -r|--relocatable) ICF="" ;;
-  esac
-done
-exec ld.lld --thinlto-cache-dir="$HOME/.thinlto-cache" --thinlto-cache-policy=cache_size_bytes=4g --thinlto-jobs="$(nproc --all)" $ICF "$@"
+exec ld.lld --thinlto-cache-dir="$HOME/.thinlto-cache" --thinlto-cache-policy=cache_size_bytes=4g --thinlto-jobs="$(nproc --all)" "$@"
 EOF
 chmod +x ld-wrapper
 
@@ -193,19 +186,6 @@ KCFLAGS_EXTRA+=" -mllvm -unroll-threshold=300 -mllvm -enable-loop-distribute"
 # 第一个分支、以相同数值 16 绕过该判断，等价于上游把模型值改成 16。
 KCFLAGS_EXTRA+=" -mllvm -partial-unrolling-threshold=16"
 
-# 编译期实验（能力检测，不支持则跳过）
-if echo 'int f(int x){return x+1;}' | clang -x c - -mllvm -enable-merge-functions -c -o /dev/null >/dev/null 2>&1; then
-  KCFLAGS_EXTRA+=" -mllvm -enable-merge-functions"
-  info "编译期：启用 merge-functions（合并相同函数）"
-else
-  warn "clang 不支持 -enable-merge-functions，跳过"
-fi
-if echo 'int f(int x){return x+1;}' | clang -x c - -mllvm -aarch64-enable-ccmp -c -o /dev/null >/dev/null 2>&1; then
-  KCFLAGS_EXTRA+=" -mllvm -aarch64-enable-ccmp"
-  info "编译期：启用 AArch64 CCMP（条件比较合并）"
-else
-  warn "clang 不支持 -aarch64-enable-ccmp，跳过"
-fi
 # 基于 AFDO 画像的机器块布局（ext-TSP），把热块排到一起
 KCFLAGS_EXTRA+=" -mllvm -enable-ext-tsp-block-placement=1"
 
