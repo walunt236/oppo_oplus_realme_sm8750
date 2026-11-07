@@ -21,6 +21,7 @@ grep -q "previously applied" /tmp/bore.log && echo "[BORE] 补丁已存在（视
 
 echo "[BORE] fair.c 兜底修正..."
 python3 "$WS/scripts/bore_fixup.py" kernel/sched/fair.c || echo "[BORE] fixup 失败"
+python3 "$WS/scripts/bore_gate.py" kernel/sched/fair.c || echo "[BORE] gate 失败"
 
 echo "[BORE] sched.h KABI 原地变换..."
 python3 "$WS/scripts/bore_kabi.py" include/linux/sched.h || echo "[BORE] KABI 变换失败"
