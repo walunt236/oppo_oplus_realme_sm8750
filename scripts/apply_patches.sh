@@ -595,6 +595,7 @@ if [[ "${BORE_ENABLE:-true}" == "true" ]]; then
     else
       warn "BORE 新文件缺失，补丁可能未完整应用"
     fi
+    python3 "$GITHUB_WORKSPACE/scripts/bore_fixup.py" kernel/sched/fair.c 2>&1 || warn "BORE fixup 执行失败"
     _rej=$(find . -name "*.rej" 2>/dev/null | head -5)
     [ -n "$_rej" ] && warn "残留 rej 文件: $_rej"
   else
