@@ -136,3 +136,7 @@ cat "$GITHUB_WORKSPACE/configs/features/hz300.config" >> "$DCFG"
 echo "CONFIG_PER_VMA_LOCK_STATS=y" >> ./common/arch/arm64/configs/gki_defconfig
 
 cat "$GITHUB_WORKSPACE/configs/features/perf_toggles.config" >> "$DCFG"
+# BORE 配置（BORE_ENABLE=true 才注入）
+if [[ "${BORE_ENABLE:-false}" == "true" ]]; then
+  cat "$GITHUB_WORKSPACE/configs/features/bore.config" >> "$DCFG"
+fi
