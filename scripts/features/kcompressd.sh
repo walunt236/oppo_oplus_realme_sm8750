@@ -109,6 +109,12 @@ if "kcompress_fifo" not in s:
 PYEOF
 fi
 
+# 诊断：跳过 kthread 创建（定位卡开机）
+if [[ "${KCOMPRESSD_NO_THREAD:-true}" == "true" ]]; then
+  warn "[KCOMPRESSD] 诊断模式：禁用 kthread 创建"
+  python3 "$WS/scripts/features/kcompressd_no_thread.py" || warn "[KCOMPRESSD] 诊断脚本执行失败"
+fi
+
 missing="$(missing_markers)"
 if [[ -z "$missing" ]]; then
   info "[KCOMPRESSD] 幂等校验通过：${#MARKERS[@]} 处标识齐全"
