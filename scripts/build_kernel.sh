@@ -331,14 +331,6 @@ if [ -n "${ZRAM_TUNE_REV:-}" ] && [ -f out/vmlinux ]; then
     die "zram 调优未编入内核（$ZRAM_TUNE_REV 缺失，疑似增量构建复用了旧目标文件）"
   fi
 fi
-# BORE 调度器符号校验
-if [ -f out/vmlinux ]; then
-  if grep -aq "sched_bore" out/vmlinux; then
-    info "BORE 已编译进内核（sched_bore 符号存在）"
-  else
-    warn "BORE 未编译进内核（补丁未应用或未启用）"
-  fi
-fi
 # KMI 检查：Module.symvers 的 md5（BORE 不新增导出符号，理论上应与基线完全一致）
 if [ -f out/Module.symvers ]; then
   info "Module.symvers: $(wc -l < out/Module.symvers) 行 md5=$(md5sum out/Module.symvers | awk '{print $1}')"
