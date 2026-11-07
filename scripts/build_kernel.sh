@@ -235,15 +235,21 @@ fi
 # AFDO 热函数排序表（链接期函数布局，类似 BOLT，仅改布局不改代码）
 if [ "$AFDO_PROFILE_VALID" -eq 1 ]; then
   PROFDATA_HOT="$HOME/.toolchains/Clang-19.0.0git-20240723/bin/llvm-profdata"
+  HOT_TMP=/tmp/hot_symbols.txt
   if [ -x "$PROFDATA_HOT" ]; then
     "$PROFDATA_HOT" show -sample "$AFDO_PROFILE" 2>/dev/null | awk '
       /^Function: / { name=$2 }
       /Total samples: / { print $3, name }
-    ' | LC_ALL=C sort -k1,1nr | head -3000 | awk '{print $2}' | grep -E '^[A-Za-z_][A-Za-z0-9_.$]*$' > /tmp/hot_symbols.txt || true
-    if [ -s /tmp/hot_symbols.txt ]; then
-      export HOTFILE=/tmp/hot_symbols.txt
-      info "AFDO 热函数排序表: $(wc -l < "$HOTFILE") 个符号（链接期排序）"
-    fi
+    ' | LC_ALL=C sort -k1,1nr | head -3000 | awk '{print $2}' | grep -E '^[A-Za-z_][A-Za-z0-9_.$]*$' > "$HOT_TMP" || true
+  fi
+  if [ ! -s "$HOT_TMP" ]; then
+    grep -E '^[A-Za-z_][A-Za-z0-9_.$]*:[0-9]+$' "$AFDO_PROFILE" 2>/dev/null | LC_ALL=C sort -t: -k2 -nr | head -3000 | cut -d: -f1 > "$HOT_TMP" || true
+  fi
+  if [ -s "$HOT_TMP" ]; then
+    export HOTFILE="$HOT_TMP"
+    info "AFDO 热函数排序表: $(wc -l < "$HOTFILE") 个符号（链接期排序）"
+  else
+    warn "AFDO 排序表生成失败（profile 文本格式不识别），跳过链接期排序"
   fi
 fi
 # 编译器参数官方工具链支持验证
