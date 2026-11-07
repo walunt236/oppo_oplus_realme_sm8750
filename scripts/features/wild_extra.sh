@@ -6,7 +6,7 @@ WS="${GITHUB_WORKSPACE:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 export GITHUB_WORKSPACE="$WS"
 source "$WS/scripts/common.sh"
 
-if [ "${WILD_EXTRA_ENABLE:-true}" != "true" ]; then
+if [ "${WILD_EXTRA_ENABLE:-false}" != "true" ]; then
   info "[WILD_EXTRA] 未启用，跳过"
   exit 0
 fi
