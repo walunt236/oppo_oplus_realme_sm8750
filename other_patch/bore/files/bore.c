@@ -253,7 +253,7 @@ static inline u8 inherit_burst_tg(struct task_struct *p, u64 now) {
 
 void sched_clone_bore(
 	struct task_struct *p, struct task_struct *parent, u64 clone_flags) {
-	if (!task_is_bore_eligible(p)) return;
+	if (!sched_bore || !task_is_bore_eligible(p)) return;
 
 	u64 now = ktime_get_ns();
 	read_lock(&tasklist_lock);
