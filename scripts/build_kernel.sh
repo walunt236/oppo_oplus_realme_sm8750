@@ -185,6 +185,15 @@ KCFLAGS_EXTRA+=" -mllvm -unroll-threshold=300 -mllvm -enable-loop-distribute"
 # 导致运行时 trip count 的循环永不展开。命令行传入 PartialUnrollingThreshold 会走
 # 第一个分支、以相同数值 16 绕过该判断，等价于上游把模型值改成 16。
 KCFLAGS_EXTRA+=" -mllvm -partial-unrolling-threshold=16"
+# 编译期实验批（能力检测，不支持则跳过）
+for FLAG in "-mllvm -enable-dfa-jump-thread" "-mllvm -misched-postra=true" "-mllvm -align-all-nofallthru-blocks=5" "-mllvm -enable-constraint-elimination"; do
+  if echo 'int f(int x){return x+1;}' | clang -x c - $FLAG -c -o /dev/null >/dev/null 2>&1; then
+    KCFLAGS_EXTRA+=" $FLAG"
+    info "编译期：启用 $FLAG"
+  else
+    warn "clang 不支持 $FLAG，跳过"
+  fi
+done
 
 # 基于 AFDO 画像的机器块布局（ext-TSP），把热块排到一起
 KCFLAGS_EXTRA+=" -mllvm -enable-ext-tsp-block-placement=1"
