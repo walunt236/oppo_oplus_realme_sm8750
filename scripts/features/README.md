@@ -26,6 +26,7 @@ apply_patches.sh：428 → 217 → 68 行；剩余内容为调用顺序与状态
 | 调度器 | features/sched.sh | SCHED_ENABLE（默认 true） | NEXT_BUDDY / HRTICK / SIS_PROP / CACHE_HOT_BUDDY / LB_MIN |
 | f2fs | features/f2fs.sh | F2FS_ENABLE（默认 true） | ATGC 路径 bug 已修（0aae0936） |
 | libbpf | features/libbpf.sh | LIBBPF_ENABLE（默认 true） | — |
+| Kcompressd | features/kcompressd.sh | KCOMPRESSD_ENABLE（默认 false） | 6.12 补丁回移 6.6；kfifo 改指针规避头文件循环；失败打印 .rej 后继续 |
 | HMBIRD/Polly | features/hmbird.sh | 无（始终执行） | 原 87-152；Overwriter/Defconfig/18 patch/EnablePOLLY/mm_* 原样搬迁，子脚本内 cd common |
 | 收尾 | features/finalize.sh | 无（始终执行） | 原 11-27、154-187；count_rejs 助手随块，Unicode/lz4 CFLAGS/dma-buf 回滚/reject 汇总 |
 

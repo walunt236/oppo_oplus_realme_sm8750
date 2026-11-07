@@ -1,0 +1,96 @@
+#!/usr/bin/env bash
+# Kcompressd-Unofficial 0.5：把 6.12 补丁回移到 6.6
+# 开关：KCOMPRESSD_ENABLE（默认 false）
+#
+# 6.6 适配要点（详见 other_patch/kcompressd/kcompressd-6.6.patch）：
+#   - __swap_writepage() 仍收 struct page *，改用 &folio->page
+#   - 无 folio->swap，改用 folio_swap_flags() 读取 SWP_SYNCHRONOUS_IO
+#   - 无 zswap_is_enabled()，用 zswap_never_enabled() 近似
+#   - 无 mem_cgroup_zswap_writeback_enabled()，移除该门控
+#   - 6.6 kfifo.h 会经 scatterlist.h 反向包含 mm.h，不能放进 mmzone.h，
+#     pglist_data 改存 struct kfifo *，由 kswapd_run() 单独分配
+set -u
+
+WS="${GITHUB_WORKSPACE:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+export GITHUB_WORKSPACE="$WS"
+# shellcheck source=/dev/null
+source "$WS/scripts/common.sh"
+
+if [[ "${KCOMPRESSD_ENABLE:-false}" != "true" ]]; then
+  info "[KCOMPRESSD] 未启用，跳过"
+  exit 0
+fi
+
+COMMON="$WS/kernel_workspace/common"
+PATCH="$WS/other_patch/kcompressd/kcompressd-6.6.patch"
+LOG="$(mktemp)"
+REJ_BEFORE="$(mktemp)"
+REJ_AFTER="$(mktemp)"
+trap 'rm -f "$LOG" "$REJ_BEFORE" "$REJ_AFTER"' EXIT
+
+[[ -f "$PATCH" ]] || die "[KCOMPRESSD] 缺少补丁: $PATCH"
+[[ -d "$COMMON" ]] || die "[KCOMPRESSD] 内核源码目录不存在: $COMMON"
+cd "$COMMON" || die "[KCOMPRESSD] 进入内核目录失败: $COMMON"
+
+MARKERS=(
+  "include/linux/mmzone.h:kcompress_fifo"
+  "include/linux/swap.h:vm_kcompressd"
+  "mm/page_io.c:kcompressd_store"
+  "mm/vmscan.c:kcompress_fifo"
+  "kernel/sysctl.c:vm_kcompressd"
+)
+
+missing_markers() {
+  local m f s
+  for m in "${MARKERS[@]}"; do
+    f="${m%%:*}"
+    s="${m#*:}"
+    if ! grep -qF -- "$s" "$f" 2>/dev/null; then
+      printf '%s\n' "$m"
+    fi
+  done
+  return 0
+}
+
+if [[ -z "$(missing_markers)" ]]; then
+  info "[KCOMPRESSD] 补丁已应用，跳过（幂等）"
+  exit 0
+fi
+
+info "[KCOMPRESSD] 应用 6.6 回移补丁: $(basename "$PATCH")"
+find . -name '*.rej' -type f 2>/dev/null | sort > "$REJ_BEFORE" || true
+
+if patch -p1 -N -F 3 < "$PATCH" > "$LOG" 2>&1; then
+  info "[KCOMPRESSD] patch 应用成功"
+else
+  warn "[KCOMPRESSD] patch 有失败 hunk，打印后继续（构建可能失败）"
+  { grep -E '^(patching file|Hunk #[0-9]+|.*FAILED)' "$LOG" || true; } | head -40 | while IFS= read -r line; do
+    warn "[KCOMPRESSD] $line"
+  done
+
+  find . -name '*.rej' -type f 2>/dev/null | sort > "$REJ_AFTER" || true
+  new_rej="$(comm -13 "$REJ_BEFORE" "$REJ_AFTER" 2>/dev/null || true)"
+  if [[ -n "$new_rej" ]]; then
+    while IFS= read -r rej; do
+      [[ -n "$rej" ]] || continue
+      warn "[KCOMPRESSD] ---- 失败 hunk: $rej ----"
+      sed -n '1,120p' "$rej" | while IFS= read -r line; do
+        warn "[KCOMPRESSD] $line"
+      done
+    done <<< "$new_rej"
+  else
+    { grep -vE '^(patching file|Hunk #[0-9]+ succeeded)' "$LOG" || true; } | head -40 | while IFS= read -r line; do
+      warn "[KCOMPRESSD] $line"
+    done
+  fi
+fi
+
+missing="$(missing_markers)"
+if [[ -z "$missing" ]]; then
+  info "[KCOMPRESSD] 幂等校验通过：${#MARKERS[@]} 处标识齐全"
+else
+  warn "[KCOMPRESSD] 幂等校验失败，缺失: $(printf '%s\n' "$missing" | tr '\n' ' ')"
+  warn "[KCOMPRESSD] 请检查上面的失败 hunk / .rej 文件"
+fi
+
+exit 0
