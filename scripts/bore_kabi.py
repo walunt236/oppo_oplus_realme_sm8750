@@ -57,6 +57,11 @@ bore = """#ifdef CONFIG_SCHED_BORE
 	ANDROID_KABI_RESERVE(3);
 	ANDROID_KABI_RESERVE(4);
 #endif"""
+# 1b) 撤销补丁对 on_rq 的拆分（补丁把 unsigned int on_rq 拆成 on_rq+rel_deadline）
+block2 = re.sub(r"[ \t]*unsigned char[ \t]+on_rq;\n[ \t]*unsigned char[ \t]+rel_deadline;\n",
+                "\tunsigned int\t\t\ton_rq;\n", block2, count=1)
+print("撤销 on_rq 拆分:", "rel_deadline" in block2 and "unsigned char" in block2)
+
 if res not in block2:
     print("BORE KABI: 保留字段未找到（可能已被补丁移动）")
     sys.exit(1)
