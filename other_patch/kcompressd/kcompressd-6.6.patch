@@ -10,20 +10,19 @@ diff --git a/include/linux/mmzone.h b/include/linux/mmzone.h
  
  /* Free memory management - zoned buddy allocator.  */
  #ifndef CONFIG_ARCH_FORCE_MAX_ORDER
-@@ -1371,6 +1373,13 @@
- 	int kswapd_failures;		/* Number of 'reclaimed == 0' runs */
+@@ -1451,6 +1451,11 @@
+ #ifdef CONFIG_MEMORY_FAILURE
+ 	struct memory_failure_stats mf_stats;
+ #endif
  
- 	ANDROID_OEM_DATA(1);
+ 	ANDROID_KABI_RESERVE(1);
 +
 +#define KCOMPRESS_FIFO_SIZE 256
 +	wait_queue_head_t kcompressd_wait;
 +	struct task_struct *kcompressd;
 +	struct kfifo *kcompress_fifo;
 +	spinlock_t kcompress_fifo_lock;
-+
- #ifdef CONFIG_COMPACTION
- 	int kcompactd_max_order;
- 	enum zone_type kcompactd_highest_zoneidx;
+ } pg_data_t;
 diff --git a/include/linux/swap.h b/include/linux/swap.h
 --- a/include/linux/swap.h
 +++ b/include/linux/swap.h
