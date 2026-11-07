@@ -6,13 +6,16 @@
 
 ## 当前状态
 
+apply_patches.sh：428 → 217 → 68 行；剩余内容为调用顺序与状态衔接。
+
 ### 已抽取（脚本）
 
 | 功能 | 脚本 | 开关 | 备注 |
 |---|---|---|---|
 | KernelSU | features/kernelsu.sh | KSU_TYPE != none | 版本号写 GITHUB_ENV/GITHUB_OUTPUT；KSU_TAG_DATE 经 /tmp/ksu_state.env 回传主脚本 |
-| SUSFS | features/susfs.sh | SUSFS_ENABLE | 预取/release 对齐仍留在主脚本（共用并行 wait） |
-| LZ4KD | features/lz4kd.sh | LZ4KD_ENABLE | 预取留在主脚本 |
+| 补丁仓预取 | features/prefetch.sh | 无（按 SUSFS/LZ4KD 条件启动同步） | 原 35-76；缓存目录/sync_repo 并行 wait/SUSFS release 对齐随块；变量经 /tmp/prefetch_state.env 回传主脚本 |
+| SUSFS | features/susfs.sh | SUSFS_ENABLE | 预取/release 对齐见 features/prefetch.sh（共用并行 wait） |
+| LZ4KD | features/lz4kd.sh | LZ4KD_ENABLE | 预取见 features/prefetch.sh |
 | lz4/zstd | features/lz4zstd.sh | LZ4ZSTD_ENABLE（默认 true） | 原块 178-240；lz4accel 拉取、002-zstd 过滤随块搬迁 |
 | Droidspaces | features/droidspaces.sh | DROIDSPACES_ENABLE | false 跳过，standard/extend 生效 |
 | ADIOS | features/adios.sh | ADIOS_ENABLE（默认 true） | — |
@@ -23,6 +26,8 @@
 | 调度器 | features/sched.sh | SCHED_ENABLE（默认 true） | NEXT_BUDDY / HRTICK / SIS_PROP / CACHE_HOT_BUDDY / LB_MIN |
 | f2fs | features/f2fs.sh | F2FS_ENABLE（默认 true） | ATGC 路径 bug 已修（0aae0936） |
 | libbpf | features/libbpf.sh | LIBBPF_ENABLE（默认 true） | — |
+| HMBIRD/Polly | features/hmbird.sh | 无（始终执行） | 原 87-152；Overwriter/Defconfig/18 patch/EnablePOLLY/mm_* 原样搬迁，子脚本内 cd common |
+| 收尾 | features/finalize.sh | 无（始终执行） | 原 11-27、154-187；count_rejs 助手随块，Unicode/lz4 CFLAGS/dma-buf 回滚/reject 汇总 |
 
 ### 已抽取（配置片段）
 
@@ -34,11 +39,10 @@ config_inject.sh：587 → 136 行，配置指令序列与改造前逐行一致�
 
 ### 未抽取（有意保留）
 
+apply_patches.sh 的功能块已全部模块化；以下仅剩 config_inject.sh 的混合配置块。
+
 | 块 | 位置 | 原因 |
 |---|---|---|
-| SUSFS 预取/release 对齐 | apply_patches.sh 35-76 | 与 zram/WILD 共用并行 wait；release 对齐依赖 KSU_TAG_DATE |
-| LZ4KD 预取 | apply_patches.sh 49-51 | 与 zram/WILD 共用并行 wait |
-| HMBIRD/Polly 内存/IO 补丁 | apply_patches.sh 87-152 | 多条 patch 与 cwd/循环变量耦合，本次未拆 |
 | 混合配置块（echo+sed+AFDO 交错） | config_inject.sh L43-62 | 拆开风险大 |
 
 ## 约定
