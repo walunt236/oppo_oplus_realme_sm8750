@@ -7,7 +7,7 @@ on:
         description: '启用 BORE 调度器（实验）'
         required: false
         type: boolean
-        default: true
+        default: false
       runner_type:
         description: '编译机'
         required: true
