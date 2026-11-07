@@ -30,7 +30,7 @@ on:
         description: '集成susfs'
         required: true
         type: boolean
-        default: false
+        default: true
       kpm_enable:
         description: '集成kpm'
         required: true
@@ -83,7 +83,7 @@ on:
         description: 'AutoFDO 模式：off=关闭 / use=使用已有采样 / generate=生成可采样内核'
         required: true
         type: choice
-        default: 'off'
+        default: 'use'
         options:
           - 'off'
           - 'use'
