@@ -21,7 +21,7 @@ cd "$WS/kernel_workspace/common"
 # f2fs：默认启用 ATGC（年龄阈值 GC）与 GC_MERGE（GC 写合并）
 # 两者在 6.6.143 里已存在，但只能通过挂载参数开启；而挂载参数由 ROM 的 fstab 决定。
 # 这里在 default_options() 之后、解析挂载参数之前打开，ROM 显式传 nogc_merge 仍可覆盖。
-F2FS_ATGC_PATCH='" + D + "GITHUB_WORKSPACE/other_patch/f2fs/f2fs_default_atgc_gcmerge.patch'
+F2FS_ATGC_PATCH="$GITHUB_WORKSPACE/other_patch/f2fs/f2fs_default_atgc_gcmerge.patch"
 if [ -f "$F2FS_ATGC_PATCH" ]; then
   if patch -p1 --forward -F 3 < "$F2FS_ATGC_PATCH" >/dev/null 2>&1; then
     info "f2fs ATGC / GC_MERGE 默认值已启用"
