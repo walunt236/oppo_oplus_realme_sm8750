@@ -3,7 +3,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 fail=0
 
-for f in scripts/*.sh; do
+for f in scripts/*.sh scripts/features/*.sh; do
   if bash -n "$f" 2>/dev/null; then
     echo "[lint] bash -n: $f OK"
   else
@@ -15,7 +15,7 @@ done
 python3 - << 'PYEOF'
 import re, sys, pathlib
 bad = 0
-for pattern in ('.github/workflows/*.yml', 'scripts/*.sh'):
+for pattern in ('.github/workflows/*.yml', 'scripts/*.sh scripts/features/*.sh'):
     for f in sorted(pathlib.Path('.').glob(pattern)):
         lines = f.read_text(encoding='utf-8', errors='replace').splitlines()
         text = "\n".join(lines)
