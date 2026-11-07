@@ -339,6 +339,14 @@ if [ -f out/vmlinux ]; then
     warn "BORE 未编译进内核（补丁未应用或未启用）"
   fi
 fi
+# KMI 检查：Module.symvers 的 md5（BORE 不新增导出符号，理论上应与基线完全一致）
+if [ -f out/Module.symvers ]; then
+  info "Module.symvers: $(wc -l < out/Module.symvers) 行 md5=$(md5sum out/Module.symvers | awk '{print $1}')"
+fi
+# 结构体布局（若环境有 pahole）
+if command -v pahole >/dev/null 2>&1 && [ -f out/vmlinux ]; then
+  info "sched_entity: $(pahole -C sched_entity out/vmlinux 2>/dev/null | head -2 | tr '\n' ' ')"
+fi
 if nm out/vmlinux 2>/dev/null | grep -q "_lz4_decompress_asm"; then
   info "_lz4_decompress_asm 符号校验通过"
 else
