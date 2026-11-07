@@ -27,6 +27,7 @@ if [[ "$LZ4KD_ENABLE" == "true" ]]; then
 fi
 
 cat "$GITHUB_WORKSPACE/configs/features/zram.config" >> "$DCFG"
+cat "$GITHUB_WORKSPACE/configs/features/zsmalloc_chain.config" >> "$DCFG"
 
 
 echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" >> "$DCFG"
