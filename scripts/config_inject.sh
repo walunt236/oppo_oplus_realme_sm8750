@@ -6,7 +6,7 @@ cd "$GITHUB_WORKSPACE/kernel_workspace"
 DCFG="./common/arch/arm64/configs/gki_defconfig"
 
 if [[ "$SUSFS_ENABLE" == "true" && "$KSU_TYPE" != "none" ]]; then
-  cat "$GITHUB_WORKSPACE/configs/features/zram.config" >> "$DCFG"
+  cat "$GITHUB_WORKSPACE/configs/features/ksu_susfs.config" >> "$DCFG"
 else
   echo "CONFIG_KSU_SUSFS=n" >> "$DCFG"
 fi
