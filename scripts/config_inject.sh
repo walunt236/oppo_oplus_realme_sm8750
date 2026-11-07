@@ -20,24 +20,13 @@ fi
 if [[ "$KPM_ENABLE" == 'builtin' ]] && ( [[ "$KSU_TYPE" == "sukisu" ]] || [[ "$KSU_TYPE" == "resukisu" ]] ); then
   echo "CONFIG_KPM=y" >> "$DCFG"
 fi
-echo "CONFIG_TMPFS_XATTR=y" >> "$DCFG"
-echo "CONFIG_TMPFS_POSIX_ACL=y" >> "$DCFG"
+cat "$GITHUB_WORKSPACE/configs/features/tmpfs.config" >> "$DCFG"
 
 if [[ "$LZ4KD_ENABLE" == "true" ]]; then
-  cat >> "$DCFG" << 'LZ4KDCFG'
-CONFIG_ZSMALLOC=y
-CONFIG_CRYPTO_LZ4K=y
-CONFIG_CRYPTO_LZ4KD=y
-CONFIG_CRYPTO_842=y
-LZ4KDCFG
+  cat "$GITHUB_WORKSPACE/configs/features/lz4kd.config" >> "$DCFG"
 fi
 
-# zram 双重压缩：主算法 lz4（解压快，页错误延迟低）+ 冷数据由 lz4hc 重压缩（压缩率高）
-# 不能放进 LZ4KD 条件块：否则关闭 lz4kd 时会退回 Kconfig 默认的 lzo-rle
-cat >> "$DCFG" << 'ZRAMDEFCFG'
-CONFIG_ZRAM_DEF_COMP_LZ4=y
-CONFIG_ZRAM_DEF_COMP="lz4"
-ZRAMDEFCFG
+cat "$GITHUB_WORKSPACE/configs/features/zram.config" >> "$DCFG"
 
 
 echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" >> "$DCFG"
@@ -61,66 +50,17 @@ else
 fi
 echo "CONFIG_SECTION_MISMATCH_WARN_ONLY=y" >> "$DCFG"
 
-echo 'CONFIG_ZRAM=y' >> "$DCFG"
-echo 'CONFIG_ZRAM_MEMORY_TRACKING=y' >> "$DCFG"
-echo 'CONFIG_RANDOMIZE_KSTACK_OFFSET_DEFAULT=y' >> "$DCFG"
-echo 'CONFIG_IOMMU_DEFAULT_DMA_STRICT=y' >> "$DCFG"
+cat "$GITHUB_WORKSPACE/configs/features/misc_toggles.config" >> "$DCFG"
 
-cat >> "$DCFG" << 'TUNECFG'
-CONFIG_LTO_CLANG_THIN=y
-CONFIG_LLVM_POLLY=y
-CONFIG_CRYPTO_LZ4=y
-CONFIG_CRYPTO_LZ4HC=y
-CONFIG_LZ4_COMPRESS=y
-CONFIG_LZ4HC_COMPRESS=y
-CONFIG_LZ4_DECOMPRESS=y
-CONFIG_CRYPTO_ZSTD=y
-CONFIG_CRYPTO_SHA3_ARM64=y
-CONFIG_CRYPTO_SM3_ARM64_CE=y
-CONFIG_CRYPTO_SM4_ARM64_CE=y
-CONFIG_CRYPTO_SM4_ARM64_CE_BLK=y
-CONFIG_CRYPTO_SHA256_ARM64=y
-CONFIG_CRYPTO_AES_ARM64_CE=y
-CONFIG_CRYPTO_AES_ARM64_CE_BLK=y
-CONFIG_CRYPTO_AES_ARM64_CE_CCM=y
-CONFIG_CRYPTO_CHACHA20_NEON=y
-CONFIG_THP_SWAP=y
-CONFIG_NET_SCH_ETS=y
-CONFIG_ZSTD_COMPRESS=y
-CONFIG_ZSTD_DECOMPRESS=y
-CONFIG_SLAB_MERGE_DEFAULT=y
-CONFIG_F2FS_FS_LZ4=y
-CONFIG_F2FS_FS_LZ4HC=y
-CONFIG_F2FS_FS_ZSTD=y
-CONFIG_EROFS_FS_ZIP_LZMA=y
-CONFIG_EROFS_FS_ZIP_DEFLATE=y
-CONFIG_ARM_SPE_PMU=y
-CONFIG_LRU_GEN=y
-CONFIG_LRU_GEN_ENABLED=y
-CONFIG_DAMON_PADDR=y
-CONFIG_DAMON_RECLAIM=y
-CONFIG_DAMON_LRU_SORT=y
-CONFIG_NET_SCH_CAKE=y
-CONFIG_SECURITY_LANDLOCK=y
-TUNECFG
+cat "$GITHUB_WORKSPACE/configs/features/kernel_tunables.config" >> "$DCFG"
 
 if [[ "$RCU_NOCB_ENABLE" == "true" ]]; then
   info "开启 RCU_NOCB_CPU..."
-  cat >> "$DCFG" << 'RCUCFG'
-CONFIG_RCU_EXPERT=y
-CONFIG_RCU_NOCB_CPU=y
-CONFIG_RCU_NOCB_CPU_DEFAULT_ALL=y
-CONFIG_RCU_LAZY_DEFAULT_OFF=n
-CONFIG_RCU_NOCB_CPU_CB_BOOST=y
-RCUCFG
+  cat "$GITHUB_WORKSPACE/configs/features/rcu.config" >> "$DCFG"
   info "RCU_LAZY 默认启用"
 fi
 
-cat >> "$DCFG" << 'NSCFG'
-CONFIG_UTS_NS=y
-CONFIG_USER_NS=y
-CONFIG_DEVTMPFS=y
-NSCFG
+cat "$GITHUB_WORKSPACE/configs/features/namespaces.config" >> "$DCFG"
 
 info "注入 Vendor 驱动符号 (UBSAN / KUNIT)..."
 grep -q "CFLAGS_configs.o := -D__IKCFG_BUILD" ./common/kernel/Makefile || \
@@ -134,17 +74,7 @@ if [ -f ./common/drivers/block/zram/zram_drv.c ]; then
   python3 "$GITHUB_WORKSPACE/scripts/zram_src_tune.py" ./common/drivers/block/zram/zram_drv.c ||     warn "zram 源码调整失败（不影响构建，行为保持上游）"
 fi
 apply_patch_file "other_patch/damon/damon_reclaim_defaults.patch" /tmp/damon_reclaim.patch strict "DAMON_RECLAIM 默认参数补丁"
-cat >> "$DCFG" << 'OEMDEPENDS'
-CONFIG_UBSAN=y
-CONFIG_UBSAN_TRAP=y
-CONFIG_CC_HAS_UBSAN_ARRAY_BOUNDS=y
-CONFIG_UBSAN_BOUNDS=y
-CONFIG_UBSAN_ARRAY_BOUNDS=y
-CONFIG_UBSAN_LOCAL_BOUNDS=y
-CONFIG_UBSAN_SANITIZE_ALL=n
-CONFIG_KUNIT=m
-CONFIG_KUNIT_DEBUGFS=y
-OEMDEPENDS
+cat "$GITHUB_WORKSPACE/configs/features/ubsan_oem.config" >> "$DCFG"
 
 # cmdline 注入
 info "对 init/main.c 注入 cmdline..."
@@ -167,77 +97,19 @@ fi
 
 # 网络功能增强
 cd "$GITHUB_WORKSPACE/kernel_workspace"
-cat >> ./common/arch/arm64/configs/gki_defconfig << 'NETCFG'
-CONFIG_NETFILTER_XT_TARGET_HL=y
-CONFIG_NETFILTER_XT_MATCH_HL=y
-CONFIG_NF_CONNTRACK=y
-CONFIG_NF_NAT=y
-CONFIG_NF_NAT_MASQUERADE=y
-CONFIG_NF_NAT_REDIRECT=y
-CONFIG_NETFILTER_XT_MATCH_CONNTRACK=y
-CONFIG_IP6_NF_IPTABLES=y
-CONFIG_IP6_NF_FILTER=y
-CONFIG_IP6_NF_MANGLE=y
-CONFIG_IP6_NF_NAT=y
-CONFIG_IP6_NF_TARGET_MASQUERADE=y
-CONFIG_IP_NF_NAT=y
-CONFIG_IP_NF_TARGET_MASQUERADE=y
-CONFIG_IP_NF_TARGET_REDIRECT=y
-CONFIG_NF_TABLES=n
-CONFIG_BPF_STREAM_PARSER=y
-CONFIG_NETFILTER_XT_MATCH_ADDRTYPE=y
-CONFIG_NETFILTER_XT_SET=y
-CONFIG_IP_SET=y
-CONFIG_IP_SET_MAX=65534
-CONFIG_IP_SET_BITMAP_IP=y
-CONFIG_IP_SET_BITMAP_IPMAC=y
-CONFIG_IP_SET_BITMAP_PORT=y
-CONFIG_IP_SET_HASH_IP=y
-CONFIG_IP_SET_HASH_IPMARK=y
-CONFIG_IP_SET_HASH_IPPORT=y
-CONFIG_IP_SET_HASH_IPPORTIP=y
-CONFIG_IP_SET_HASH_IPPORTNET=y
-CONFIG_IP_SET_HASH_IPMAC=y
-CONFIG_IP_SET_HASH_MAC=y
-CONFIG_IP_SET_HASH_NETPORTNET=y
-CONFIG_IP_SET_HASH_NET=y
-CONFIG_IP_SET_HASH_NETNET=y
-CONFIG_IP_SET_HASH_NETPORT=y
-CONFIG_IP_SET_HASH_NETIFACE=y
-CONFIG_IP_SET_LIST_SET=y
-CONFIG_NET_SCH_FQ=y
-CONFIG_NET_SCH_PIE=y
-CONFIG_DEFAULT_FQ=y
-CONFIG_NET_SCH_FQ_CODEL=y
-CONFIG_TCP_CONG_CUBIC=y
-NETCFG
+cat "$GITHUB_WORKSPACE/configs/features/netfilter.config" >> "$DCFG"
 
 # Droidspaces 配置块
 if [[ "$DROIDSPACES_ENABLE" != "false" ]]; then
-  cd "$GITHUB_WORKSPACE/kernel_workspace/common"
-  cat >> ./arch/arm64/configs/gki_defconfig << 'DSCFG'
-CONFIG_PID_NS=y
-CONFIG_IPC_NS=y
-CONFIG_SYSVIPC=y
-CONFIG_NAMESPACES=y
-CONFIG_POSIX_MQUEUE=y
-CONFIG_NETFILTER_XT_MATCH_ADDRTYPE=y
-CONFIG_NETFILTER_XT_TARGET_LOG=y
-CONFIG_NETFILTER_XT_MATCH_RECENT=y
-CONFIG_NTSYNC=y
-DSCFG
+  cat "$GITHUB_WORKSPACE/configs/features/droidspaces.config" >> "$DCFG"
   if [[ "$DROIDSPACES_ENABLE" == "extend" ]]; then
-    echo "CONFIG_BT_HCIVHCI=y" >> ./arch/arm64/configs/gki_defconfig
-    echo "CONFIG_STATIC_USERMODEHELPER=n" >> ./arch/arm64/configs/gki_defconfig
+    cat "$GITHUB_WORKSPACE/configs/features/droidspaces_extend.config" >> "$DCFG"
   fi
 fi
 
 # ADIOS 配置块
 cd "$GITHUB_WORKSPACE/kernel_workspace"
-cat >> ./common/arch/arm64/configs/gki_defconfig << 'ADIOSCFG'
-CONFIG_MQ_IOSCHED_ADIOS=y
-CONFIG_MQ_IOSCHED_DEFAULT_ADIOS=y
-ADIOSCFG
+cat "$GITHUB_WORKSPACE/configs/features/adios.config" >> "$DCFG"
 
 # 版本固化
 cd "$GITHUB_WORKSPACE/kernel_workspace"
@@ -257,17 +129,8 @@ sed -i 's|^echo "\$res"$|echo "'"${LOCALVER}"'"|' ./common/scripts/setlocalversi
 # HZ=300
 info "启用 HZ=300..."
 cd "$GITHUB_WORKSPACE/kernel_workspace"
-cat >> ./common/arch/arm64/configs/gki_defconfig << 'HZ300CFG'
-# CONFIG_HZ_250 is not set
-CONFIG_HZ_300=y
-CONFIG_HZ=300
-HZ300CFG
+cat "$GITHUB_WORKSPACE/configs/features/hz300.config" >> "$DCFG"
 
 echo "CONFIG_PER_VMA_LOCK_STATS=y" >> ./common/arch/arm64/configs/gki_defconfig
 
-# 性能优先：关闭两项加固带来的固定开销。
-#   INIT_ON_ALLOC_DEFAULT_ON : 每次内存分配强制清零，典型 1~5% 开销
-#   SHUFFLE_PAGE_ALLOCATOR   : 页分配随机化，破坏缓存局部性，典型 1~2% 开销
-# 均可通过启动参数恢复（init_on_alloc=1 / page_alloc.shuffle=1）。
-echo "# CONFIG_INIT_ON_ALLOC_DEFAULT_ON is not set" >> "$DCFG"
-echo "# CONFIG_SHUFFLE_PAGE_ALLOCATOR is not set" >> "$DCFG"
+cat "$GITHUB_WORKSPACE/configs/features/perf_toggles.config" >> "$DCFG"
