@@ -79,7 +79,7 @@ elif [[ "$KSU_TYPE" == "ksunext" ]]; then
   # drivers/kernelsu 是指向 KernelSU-Next/kernel 的符号链接，patch 不会跟随，
   # 所以进到链接目录内部用 -p3 应用（剥掉 a/drivers/kernelsu/ 三段）。
   cd ../common/drivers/kernelsu
-  patch -p3 -N -F 3 < "$GITHUB_WORKSPACE/other_patch/apk_sign.patch" > /tmp/apk_sign.log 2>&1 || true
+  patch -p3 -N -F 3 < "$GITHUB_WORKSPACE/other_patch/ksu/apk_sign.patch" > /tmp/apk_sign.log 2>&1 || true
   if grep -q 'pershoot Manager' manager/apk_sign.c 2>/dev/null; then
     info "多管理器签名支持已生效（pershoot / Wild_KSU）"
   else
@@ -179,7 +179,7 @@ if [[ "$SUSFS_ENABLE" == "true" ]]; then
     rm -rf susfs4ksu
     cp -r "$SUSFS_CACHE_DIR" susfs4ksu
 
-    cp "$GITHUB_WORKSPACE/other_patch/69_hide_stuff.patch" ./common/69_hide_stuff.patch
+    cp "$GITHUB_WORKSPACE/other_patch/ksu/69_hide_stuff.patch" ./common/69_hide_stuff.patch
 
     cp ./susfs4ksu/kernel_patches/50_add_susfs_in_${SUSFS_BRANCH}.patch ./common/
     cp ./susfs4ksu/kernel_patches/fs/* ./common/fs/
@@ -251,7 +251,7 @@ fi
 # lz4/zstd
 cd "$GITHUB_WORKSPACE/kernel_workspace/common"
 
-# 001-lz4.patch 已固化为 other_patch/lz4_1.10_neon.patch，不再从上游拉取
+# 001-lz4.patch 已固化为 other_patch/lz4/lz4_1.10_neon.patch，不再从上游拉取
 cp "$ZRAM_CACHE_DIR/zram/002-zstd.patch" . || exit 1
 
 mkdir -p lib/lz4/lz4armv8
@@ -272,7 +272,7 @@ cp "$ACCEL_DIR/lz4accel.h" fs/f2fs/lz4armv8/
 #   1) lz4armv8.S 的二进制段在 11283 行被截断（corrupt binary patch）
 #   2) lz4hc_compress.c 的删除段因上下文不符而失败
 # 已剔除这两段并固化为标准 git 补丁，可严格应用；.S 由下面单独拷贝，旧文件单独删除。
-LZ4_NEON_PATCH="$GITHUB_WORKSPACE/other_patch/lz4_1.10_neon.patch"
+LZ4_NEON_PATCH="$GITHUB_WORKSPACE/other_patch/lz4/lz4_1.10_neon.patch"
 [ -f "$LZ4_NEON_PATCH" ] || die "缺少 lz4 1.10/NEON 补丁: $LZ4_NEON_PATCH"
 git apply --whitespace=nowarn "$LZ4_NEON_PATCH" > /tmp/lz4_patch.log 2>&1 || die "lz4 1.10/NEON 补丁应用失败（详见 /tmp/lz4_patch.log）"
 rm -f lib/lz4/lz4hc_compress.c
@@ -436,10 +436,10 @@ fi
 if [[ "$DROIDSPACES_ENABLE" != "false" ]]; then
   info "启用 Droidspaces 容器支持..."
   cd "$GITHUB_WORKSPACE/kernel_workspace"
-  apply_patch_file "droidspaces_patch/fix_sysvipc_kabi_6_7_8.patch" /tmp/fix_sysvipc.patch nonstrict "fix_sysvipc_kabi 补丁"
-  apply_patch_file "droidspaces_patch/fix_oplus_bsp_midas.patch" /tmp/fix_midas.patch nonstrict "fix_oplus_bsp_midas 补丁"
-  cp "$GITHUB_WORKSPACE/droidspaces_patch/ntsync_base.patch" /tmp/ntsync_base.patch
-  if cp "$GITHUB_WORKSPACE/droidspaces_patch/ntsync_compat_android15-$KERNEL_VERSION.patch" /tmp/ntsync_compat.patch; then
+  apply_patch_file "other_patch/droidspaces/fix_sysvipc_kabi_6_7_8.patch" /tmp/fix_sysvipc.patch nonstrict "fix_sysvipc_kabi 补丁"
+  apply_patch_file "other_patch/droidspaces/fix_oplus_bsp_midas.patch" /tmp/fix_midas.patch nonstrict "fix_oplus_bsp_midas 补丁"
+  cp "$GITHUB_WORKSPACE/other_patch/droidspaces/ntsync_base.patch" /tmp/ntsync_base.patch
+  if cp "$GITHUB_WORKSPACE/other_patch/droidspaces/ntsync_compat_android15-$KERNEL_VERSION.patch" /tmp/ntsync_compat.patch; then
     ( cd ./common && patch -p1 -F 3 < /tmp/ntsync_base.patch > /tmp/ntsync.log 2>&1 ) || true
     ( cd ./common && patch -p1 -F 3 < /tmp/ntsync_compat.patch >> /tmp/ntsync.log 2>&1 ) || true
     if [ -f ./common/drivers/misc/ntsync.c ]; then
@@ -452,7 +452,7 @@ if [[ "$DROIDSPACES_ENABLE" != "false" ]]; then
     ( cd ./common && patch -p1 -F 3 < /tmp/ntsync_base.patch ) || true
   fi
   if [[ "$DROIDSPACES_ENABLE" == "extend" ]]; then
-    apply_patch_file "droidspaces_patch/evdi_drm.patch" /tmp/evdi_drm.patch nonstrict "evdi_drm 补丁"
+    apply_patch_file "other_patch/droidspaces/evdi_drm.patch" /tmp/evdi_drm.patch nonstrict "evdi_drm 补丁"
   fi
 fi
 
@@ -463,7 +463,7 @@ apply_patch_file "other_patch/adios/adios_block_only.patch" /tmp/adios.patch str
 
 # KVM NVHE：AutoFDO 生成的 .rel.llvm.* 元数据节会被 gen-hyprel 判为致命错误
 if [ -f ./common/arch/arm64/tools/gen-hyprel.c ] && ! grep -q 'strncmp(section_name(shdr), "\.rel\.llvm\."' ./common/arch/arm64/tools/gen-hyprel.c; then
-  apply_patch_file "other_patch/nvhe_skip_cgprofile_rel.patch" /tmp/nvhe_cgprof.patch strict "KVM NVHE call-graph-profile 兼容"
+  apply_patch_file "other_patch/nvhe/nvhe_skip_cgprofile_rel.patch" /tmp/nvhe_cgprof.patch strict "KVM NVHE call-graph-profile 兼容"
 fi
 
 # Re-Kernel
@@ -530,7 +530,7 @@ info "调度器优化完成 (PELT 32ms 上游默认 / NEXT_BUDDY / HRTICK / SIS_
 # f2fs：默认启用 ATGC（年龄阈值 GC）与 GC_MERGE（GC 写合并）
 # 两者在 6.6.143 里已存在，但只能通过挂载参数开启；而挂载参数由 ROM 的 fstab 决定。
 # 这里在 default_options() 之后、解析挂载参数之前打开，ROM 显式传 nogc_merge 仍可覆盖。
-F2FS_ATGC_PATCH='" + D + "GITHUB_WORKSPACE/other_patch/f2fs_default_atgc_gcmerge.patch'
+F2FS_ATGC_PATCH='" + D + "GITHUB_WORKSPACE/other_patch/f2fs/f2fs_default_atgc_gcmerge.patch'
 if [ -f "$F2FS_ATGC_PATCH" ]; then
   if patch -p1 --forward -F 3 < "$F2FS_ATGC_PATCH" >/dev/null 2>&1; then
     info "f2fs ATGC / GC_MERGE 默认值已启用"
@@ -547,7 +547,7 @@ fi
 
 # f2fs GC 三项调优：紧急休眠 500→50ms、拥塞超时 20→6ms、fsync 批量 8→20
 # 来源 WildKernels/kernel_patches，均已验证适用于 6.6.143
-F2FS_GC_TUNING="$GITHUB_WORKSPACE/other_patch/f2fs_gc_tuning.patch"
+F2FS_GC_TUNING="$GITHUB_WORKSPACE/other_patch/f2fs/f2fs_gc_tuning.patch"
 if [ -f "$F2FS_GC_TUNING" ]; then
   patch -p1 --forward -F 3 < "$F2FS_GC_TUNING" > /tmp/f2fs_gc_tuning.log 2>&1 || true
 fi
