@@ -66,3 +66,5 @@ bash "$GITHUB_WORKSPACE/scripts/features/libbpf.sh"
 
 touch /tmp/sync_failed.list "$PENDING_SYNC"
 sort -u "$PENDING_SYNC" /tmp/sync_failed.list -o "$PENDING_SYNC"
+# BORE（默认关闭，BORE_ENABLE=true 才应用）
+bash "$GITHUB_WORKSPACE/scripts/features/bore.sh"
