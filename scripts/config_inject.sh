@@ -576,9 +576,8 @@ echo "CONFIG_PER_VMA_LOCK_STATS=y" >> ./common/arch/arm64/configs/gki_defconfig
 # 均可通过启动参数恢复（init_on_alloc=1 / page_alloc.shuffle=1）。
 echo "# CONFIG_INIT_ON_ALLOC_DEFAULT_ON is not set" >> "$DCFG"
 echo "# CONFIG_SHUFFLE_PAGE_ALLOCATOR is not set" >> "$DCFG"
-# BORE 调度器（补丁自带 Kconfig，默认 y；显式写出便于日志确认）
-# BORE 实验暂停：等适配版补丁后再启用
-# if [[ "${BORE_ENABLE:-false}" == "true" ]]; then
+# BORE 调度器（由 BORE_ENABLE 开关控制；默认关闭，等 fair.c 精确适配后再启用）
+if [[ "${BORE_ENABLE:-false}" == "true" ]]; then
   echo "CONFIG_SCHED_BORE=y" >> "$DCFG"
 fi
 info "已关闭 INIT_ON_ALLOC / SHUFFLE_PAGE_ALLOCATOR（性能优先）"
