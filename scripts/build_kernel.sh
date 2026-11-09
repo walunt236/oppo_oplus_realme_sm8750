@@ -19,7 +19,7 @@ info "AutoFDO 状态: ENABLE=${AFDO_ENABLE:-false} GENERATE=${AFDO_GENERATE:-fal
 cd "$GITHUB_WORKSPACE/kernel_workspace/common"
 # 指纹必须包含文件内容：git status 只给路径，改同一批文件的内容会被漏掉，
 # 导致增量构建复用旧 .o（实测：zram 调优改动未进内核）
-PATCH_HASH=$( { echo "clang=${CLANG_VERSION:-19}"; echo "cc=${CLANG_DIR_NAME:-}"; echo "localver=${LOCALVER:-}"; git status --porcelain 2>/dev/null; git diff 2>/dev/null; } | md5sum | cut -d' ' -f1 || true )
+PATCH_HASH=$( { git status --porcelain 2>/dev/null; git diff 2>/dev/null; } | md5sum | cut -d' ' -f1 || true )
 echo "PATCH_HASH=$PATCH_HASH" >> "$GITHUB_ENV"
 STORED=$(cut -d'|' -f1 "$HOME/.cache_patches/build_state" 2>/dev/null || true)
 if [[ "$STORED" == "$PATCH_HASH" ]]; then
@@ -34,11 +34,9 @@ fi
 # 构建内核配置
 cd "$GITHUB_WORKSPACE/kernel_workspace/common"
 
-CLANG_DIR_NAME="${CLANG_DIR_NAME:-Clang-19.0.0git-20240723}"
-
 load_toolchain_env() {
   export PATH="$HOME/.toolchains/${BT_DIR_NAME:?}/build-tools/bin:$PATH"
-  export PATH="$HOME/.toolchains/${CLANG_DIR_NAME}/bin:$PATH"
+  export PATH="$HOME/.toolchains/Clang-19.0.0git-20240723/bin:$PATH"
   export PATH="/usr/lib/ccache:$PATH"
 }
 
@@ -106,11 +104,7 @@ fi
 if [ "$AFDO_PROFILE_VALID" -eq 1 ]; then assert_config CONFIG_AUTOFDO_CLANG "AutoFDO (AUTOFDO_CLANG)"; fi
 case "${AFDO_GENERATE:-}" in true|1) assert_config CONFIG_AUTOFDO_CLANG "AutoFDO 生成模式" ;; esac
 assert_config CONFIG_SECTION_MISMATCH_WARN_ONLY "SECTION_MISMATCH_WARN_ONLY (modpost mismatch 降级警告)"
-if [ "${LTO_ENABLE:-true}" = "true" ]; then
-  assert_config CONFIG_LTO_CLANG_THIN "ThinLTO"
-else
-  assert_config CONFIG_LTO_NONE "LTO_NONE"
-fi
+assert_config CONFIG_LTO_CLANG_THIN "ThinLTO"
 assert_config CONFIG_HZ_300 "HZ=300"
 assert_config CONFIG_IP_SET "网络功能扩展 (IP_SET)"
 assert_config CONFIG_MQ_IOSCHED_ADIOS "ADIOS"
@@ -233,8 +227,8 @@ ld.lld --version
 
 # AutoFDO profile 新鲜度检测
 if [ "$AFDO_PROFILE_VALID" -eq 1 ] && [ -n "${AFDO_VMLINUX:-}" ] && [ -f "$AFDO_VMLINUX" ]; then
-  PROFDATA="$HOME/.toolchains/${CLANG_DIR_NAME}/bin/llvm-profdata"
-  NM="$HOME/.toolchains/${CLANG_DIR_NAME}/bin/llvm-nm"
+  PROFDATA="$HOME/.toolchains/Clang-19.0.0git-20240723/bin/llvm-profdata"
+  NM="$HOME/.toolchains/Clang-19.0.0git-20240723/bin/llvm-nm"
   # 去掉 ThinLTO/Clang 内部后缀（.llvm.<hash>），否则与 vmlinux 符号表对不上
   "$PROFDATA" show -sample "$AFDO_PROFILE" 2>/dev/null | grep '^Function: ' | awk '{print $2}' | sed -E 's/:.*$//; s/\.llvm\.[0-9]+$//' | LC_ALL=C sort -u > /tmp/afdo_funcs.txt || true
   "$NM" --defined-only "$AFDO_VMLINUX" 2>/dev/null | awk '$2 ~ /^[tT]$/ {print $3}' | LC_ALL=C sort -u > /tmp/vmlinux_funcs.txt || true
@@ -253,7 +247,7 @@ fi
 
 # AFDO 热函数排序表（链接期函数布局，类似 BOLT，仅改布局不改代码）
 if [ "$AFDO_PROFILE_VALID" -eq 1 ]; then
-  PROFDATA_HOT="$HOME/.toolchains/${CLANG_DIR_NAME}/bin/llvm-profdata"
+  PROFDATA_HOT="$HOME/.toolchains/Clang-19.0.0git-20240723/bin/llvm-profdata"
   HOT_TMP=/tmp/hot_symbols.txt
   HOT_RANKED=/tmp/hot_symbols.ranked
   if [ -x "$PROFDATA_HOT" ]; then
@@ -290,23 +284,21 @@ if [ "$AFDO_PROFILE_VALID" -eq 1 ]; then
   fi
 fi
 # 编译器参数官方工具链支持验证
-info "编译器参数支持验证（$CLANG_DIR_NAME）:"
-if ! clang --target=aarch64-linux-gnu -mcpu=oryon-1 -fsyntax-only -x c /dev/null >/tmp/oryon_check.log 2>&1; then
+info "编译器参数支持验证（ZyCromerZ clang 19 官方工具链）:"
+if clang -mcpu=oryon-1 -### -c /dev/null 2>&1 | grep -qE "error|unknown|not supported"; then
   echo "  ✗ -mcpu=oryon-1 不被工具链支持！" | tee -a "$LOG_FILE"
-  sed -n '1,8p' /tmp/oryon_check.log | tee -a "$LOG_FILE"
   exit 1
 else
   echo "  ✓ -mcpu=oryon-1（Oryon 目标）" | tee -a "$LOG_FILE"
 fi
 if [ "$AFDO_PROFILE_VALID" -eq 1 ]; then
-  if ! clang -fprofile-sample-use="$AFDO_PROFILE" -fprofile-sample-accurate -fdebug-info-for-profiling -mllvm -enable-fs-discriminator=true -mllvm -sample-profile-max-propagate-iterations=300 -fsyntax-only -x c /dev/null >/tmp/afdo_check.log 2>&1; then
+  if clang -fprofile-sample-use="$AFDO_PROFILE" -fprofile-sample-accurate -fdebug-info-for-profiling -mllvm -enable-fs-discriminator=true -mllvm -sample-profile-max-propagate-iterations=300 -### -c /dev/null 2>&1 | grep -qE "error|unknown|not supported"; then
     echo "  ✗ AutoFDO 参数不被工具链支持！" | tee -a "$LOG_FILE"
-    sed -n '1,10p' /tmp/afdo_check.log | tee -a "$LOG_FILE"
     exit 1
   else
     echo "  ✓ AutoFDO 全套（-fprofile-sample-use / -fprofile-sample-accurate / -fdebug-info-for-profiling / fs-discriminator / propagate-iterations=300）" | tee -a "$LOG_FILE"
   fi
-  if ! ld.lld --help 2>&1 | grep -q -- '--lto-sample-profile'; then
+  if ld.lld -m aarch64elf --lto-sample-profile="$AFDO_PROFILE" -r -o /dev/null /dev/null 2>&1 | grep -qE "error|unknown|not supported"; then
     echo "  ✗ --lto-sample-profile 不被链接器支持！" | tee -a "$LOG_FILE"
     exit 1
   else
@@ -380,11 +372,7 @@ if [ -f out/arch/arm64/boot/Image ]; then
   assert_ikcfg CONFIG_HZ_300
   assert_ikcfg CONFIG_TCP_CONG_BBR3
   assert_ikcfg CONFIG_IP_SET
-  if [ "${LTO_ENABLE:-true}" = "true" ]; then
-    assert_ikcfg CONFIG_LTO_CLANG_THIN
-  else
-    assert_ikcfg CONFIG_LTO_NONE
-  fi
+  assert_ikcfg CONFIG_LTO_CLANG_THIN
   assert_ikcfg CONFIG_MQ_IOSCHED_ADIOS
   assert_ikcfg CONFIG_SECTION_MISMATCH_WARN_ONLY
   assert_ikcfg CONFIG_PER_VMA_LOCK_STATS
