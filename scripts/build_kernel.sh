@@ -183,7 +183,7 @@ done
 # 只给最终 vmlinux 链接套排序表；ThinLTO 分区链接/模块链接各自只含
 # 部分符号，套完整排序表会对每个分区重复报 "no such symbol"
 case "$OUT" in
-  */vmlinux|vmlinux) ;;
+  vmlinux) ;;
   *) ORDER="";;
 esac
 if [ -z "$ORDER" ] && [ -n "${HOTFILE:-}" ] && [ -s "${HOTFILE:-}" ]; then
