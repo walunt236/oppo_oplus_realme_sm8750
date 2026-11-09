@@ -243,11 +243,11 @@ case "$CLANG_VERSION" in
     CLANG_STRIP=0
     ;;
   21)
-    # AOSP 官方 prebuilt：clang-r563880 = Clang 21.0.0
-    CLANG_DIR_NAME="clang-r563880"
-    CLANG_URL="https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/20052113d2a5552cfff78ac7b21fd7953cc1c592/clang-r563880.tar.gz"
+    # ZyCromerZ Clang 21（稳定分支中最新构建）
+    CLANG_DIR_NAME="Clang-21.0.0git-20250715"
+    CLANG_URL="https://github.com/ZyCromerZ/Clang/releases/download/21.0.0git-20250715-release/Clang-21.0.0git-20250715.tar.gz"
     CLANG_ARCHIVE="clang21.tar.gz"
-    CLANG_STRIP=0  # Googlesource archive 以 clang-r563880 目录内容为根，不再多一层
+    CLANG_STRIP=0
     ;;
   *)
     die "不支持的 CLANG_VERSION: $CLANG_VERSION（可选 19 / 21）"
