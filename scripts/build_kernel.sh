@@ -287,8 +287,9 @@ if [ "$AFDO_PROFILE_VALID" -eq 1 ]; then
 fi
 # 编译器参数官方工具链支持验证
 info "编译器参数支持验证（$CLANG_DIR_NAME）:"
-if clang --target=aarch64-linux-gnu -mcpu=oryon-1 -### -c /dev/null 2>&1 | grep -qE "error|unknown|not supported"; then
+if ! clang --target=aarch64-linux-gnu -mcpu=oryon-1 -fsyntax-only -x c /dev/null >/tmp/oryon_check.log 2>&1; then
   echo "  ✗ -mcpu=oryon-1 不被工具链支持！" | tee -a "$LOG_FILE"
+  sed -n '1,8p' /tmp/oryon_check.log | tee -a "$LOG_FILE"
   exit 1
 else
   echo "  ✓ -mcpu=oryon-1（Oryon 目标）" | tee -a "$LOG_FILE"
