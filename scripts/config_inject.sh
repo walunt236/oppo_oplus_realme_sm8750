@@ -114,6 +114,12 @@ if [[ "${ADIOS_ENABLE:-true}" == "true" ]]; then
   cat "$GITHUB_WORKSPACE/configs/features/adios.config" >> "$DCFG"
 fi
 
+# CFI 实验开关：关闭 CFI 用于 Clang21 兼容性验证
+if [[ "${CFI_ENABLE:-true}" != "true" ]]; then
+  echo "# CONFIG_CFI_CLANG is not set" >> "$DCFG"
+  info "CFI 已关闭（实验配置）"
+fi
+
 # 版本固化
 cd "$GITHUB_WORKSPACE/kernel_workspace"
 echo "CONFIG_LOCALVERSION_AUTO=y" >> ./common/arch/arm64/configs/gki_defconfig
