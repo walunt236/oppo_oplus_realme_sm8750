@@ -114,7 +114,7 @@ esac
 
 
 BUILD_DATE="$(TZ=Asia/Shanghai date +%Y%m%d)"
-AK3_NAME="AnyKernel3-${KSU_TYPENAME}-${KSUVER}-${KERNEL_VERSION_FULL}-${KERNEL_SUFFIX}-${BUILD_DATE}.zip"
+AK3_NAME="AnyKernel3-${KSU_TYPENAME}-${KSUVER}-${KERNEL_VERSION_FULL}-${KERNEL_SUFFIX}${CLANG_TAG:-}-${BUILD_DATE}.zip"
 FULL_VERSION="${KERNEL_VERSION_FULL}-${KERNEL_SUFFIX}"
 TIME_NOW="$(TZ='Asia/Shanghai' date +'%Y-%m-%d %H:%M:%S')"
 cat > ./ak3.log << EOF
