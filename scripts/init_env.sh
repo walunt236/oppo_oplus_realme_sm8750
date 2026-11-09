@@ -214,6 +214,9 @@ fi
 if [[ "${CFI_ENABLE:-true}" != "true" ]]; then
   CLANG_TAG="${CLANG_TAG}-nocfi"
 fi
+if [[ "${LTO_ENABLE:-true}" != "true" ]]; then
+  CLANG_TAG="${CLANG_TAG}-nolto"
+fi
 if [[ -n "$KERNEL_SUFFIX_INPUT" ]]; then
   KERNEL_SUFFIX="$KERNEL_SUFFIX_INPUT"
 else
