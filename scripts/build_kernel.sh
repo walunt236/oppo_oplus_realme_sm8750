@@ -217,7 +217,8 @@ ld.lld --version
 if [ "$AFDO_PROFILE_VALID" -eq 1 ] && [ -n "${AFDO_VMLINUX:-}" ] && [ -f "$AFDO_VMLINUX" ]; then
   PROFDATA="$HOME/.toolchains/Clang-19.0.0git-20240723/bin/llvm-profdata"
   NM="$HOME/.toolchains/Clang-19.0.0git-20240723/bin/llvm-nm"
-  "$PROFDATA" show -sample "$AFDO_PROFILE" 2>/dev/null | grep '^Function: ' | awk '{print $2}' | sed 's/:.*//' | LC_ALL=C sort -u > /tmp/afdo_funcs.txt || true
+  # 去掉 ThinLTO/Clang 内部后缀（.llvm.<hash>），否则与 vmlinux 符号表对不上
+  "$PROFDATA" show -sample "$AFDO_PROFILE" 2>/dev/null | grep '^Function: ' | awk '{print $2}' | sed -E 's/:.*$//; s/\.llvm\.[0-9]+$//' | LC_ALL=C sort -u > /tmp/afdo_funcs.txt || true
   "$NM" --defined-only "$AFDO_VMLINUX" 2>/dev/null | awk '$2 ~ /^[tT]$/ {print $3}' | LC_ALL=C sort -u > /tmp/vmlinux_funcs.txt || true
   MATCH=$(LC_ALL=C comm -12 /tmp/afdo_funcs.txt /tmp/vmlinux_funcs.txt | wc -l || true)
   TOTAL=$(wc -l < /tmp/afdo_funcs.txt)
@@ -236,20 +237,36 @@ fi
 if [ "$AFDO_PROFILE_VALID" -eq 1 ]; then
   PROFDATA_HOT="$HOME/.toolchains/Clang-19.0.0git-20240723/bin/llvm-profdata"
   HOT_TMP=/tmp/hot_symbols.txt
+  HOT_RANKED=/tmp/hot_symbols.ranked
   if [ -x "$PROFDATA_HOT" ]; then
+    # 1) 去掉 .llvm.<hash> 后缀；2) 同一基础符号的多个克隆按计数求和；
+    # 3) 按热度排序后只保留合法符号名
     "$PROFDATA_HOT" show -sample "$AFDO_PROFILE" 2>/dev/null | awk '
       /^Function: / {
         name=$2; sub(/:.*$/, "", name);
+        sub(/\.llvm\.[0-9]+$/, "", name);
         cnt=$3; sub(/,.*$/, "", cnt);
-        if (name != "" && cnt+0 > 0) print cnt, name;
-      }' | LC_ALL=C sort -nr | head -3000 | awk '{print $2}' | grep -E '^[A-Za-z_][A-Za-z0-9_.$]*$' > "$HOT_TMP" || true
+        if (name != "" && cnt+0 > 0) sum[name]+=cnt;
+      }
+      END { for (n in sum) print sum[n], n }' \
+      | LC_ALL=C sort -nr | awk '{print $2}' \
+      | grep -E '^[A-Za-z_][A-Za-z0-9_.$]*$' > "$HOT_RANKED" || true
   fi
-  if [ ! -s "$HOT_TMP" ]; then
-    grep -E '^[A-Za-z_][A-Za-z0-9_.$]*:[0-9]+$' "$AFDO_PROFILE" 2>/dev/null | LC_ALL=C sort -t: -k2 -nr | head -3000 | cut -d: -f1 > "$HOT_TMP" || true
+  if [ ! -s "$HOT_RANKED" ]; then
+    grep -E '^[A-Za-z_][A-Za-z0-9_.$]*:[0-9]+$' "$AFDO_PROFILE" 2>/dev/null \
+      | LC_ALL=C sort -t: -k2 -nr | cut -d: -f1 \
+      | sed -E 's/\.llvm\.[0-9]+$//' | awk '!seen[$0]++' > "$HOT_RANKED" || true
+  fi
+  # 若已有 vmlinux 符号表，过滤掉被内联/消除的符号，减少
+  # "symbol ordering file: no such symbol" 警告并提高排序命中率
+  if [ -s "$HOT_RANKED" ] && [ -s /tmp/vmlinux_funcs.txt ]; then
+    head -6000 "$HOT_RANKED" | LC_ALL=C grep -F -x -f /tmp/vmlinux_funcs.txt | head -3000 > "$HOT_TMP" || true
+  elif [ -s "$HOT_RANKED" ]; then
+    head -3000 "$HOT_RANKED" > "$HOT_TMP"
   fi
   if [ -s "$HOT_TMP" ]; then
     export HOTFILE="$HOT_TMP"
-    info "AFDO 热函数排序表: $(wc -l < "$HOTFILE") 个符号（链接期排序）"
+    info "AFDO 热函数排序表: $(wc -l < "$HOTFILE") 个符号（链接期排序，已剥离 .llvm 后缀）"
   else
     warn "AFDO 排序表生成失败（profile 文本格式不识别），跳过链接期排序"
   fi
