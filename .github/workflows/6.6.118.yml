@@ -136,11 +136,6 @@ on:
           - 'off'
           - 'use'
           - 'generate'
-      kernel_suffix:
-        description: '内核后缀'
-        required: false
-        type: string
-        default: ''
       diagnosis:
         description: '诊断模式：仅生成并导出config'
         required: true
@@ -190,7 +185,7 @@ jobs:
       BORE_ENABLE: ${{ inputs.bore_enable }}
       RCU_NOCB_ENABLE: ${{ inputs.rcu_nocb_enable }}
       CCACHE_DEBUG_INPUT: ${{ inputs.ccache_debug }}
-      KERNEL_SUFFIX_INPUT: ${{ inputs.kernel_suffix }}
+      KERNEL_SUFFIX_INPUT: ''
       DIAGNOSIS: ${{ inputs.diagnosis }}
       O3_SELECTIVE: ${{ inputs.o3_selective }}
       CLEAN_BUILD: ${{ inputs.clean_build }}
