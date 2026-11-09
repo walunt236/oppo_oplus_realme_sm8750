@@ -10,14 +10,6 @@ on:
         default: 'self-hosted'
         options:
           - 'self-hosted'
-      clang_version:
-        description: '编译器（19=稳定 ZyC19，21=ZyC21 实验）'
-        required: true
-        type: choice
-        default: '19'
-        options:
-          - '19'
-          - '21'
       ksu_type:
         description: 'KernelSU类型'
         required: true
@@ -166,7 +158,6 @@ jobs:
       contents: write
     env:
       LOG_FILE: ${{ github.workspace }}/build_summary.log
-      CLANG_VERSION: ${{ inputs.clang_version }}
       KSU_TYPE: ${{ inputs.ksu_type }}
       SUSFS_ENABLE: ${{ inputs.susfs_enable }}
       KPM_ENABLE: ${{ inputs.kpm_enable }}
