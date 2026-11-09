@@ -106,7 +106,11 @@ fi
 if [ "$AFDO_PROFILE_VALID" -eq 1 ]; then assert_config CONFIG_AUTOFDO_CLANG "AutoFDO (AUTOFDO_CLANG)"; fi
 case "${AFDO_GENERATE:-}" in true|1) assert_config CONFIG_AUTOFDO_CLANG "AutoFDO 生成模式" ;; esac
 assert_config CONFIG_SECTION_MISMATCH_WARN_ONLY "SECTION_MISMATCH_WARN_ONLY (modpost mismatch 降级警告)"
-assert_config CONFIG_LTO_CLANG_THIN "ThinLTO"
+if [ "${LTO_ENABLE:-true}" = "true" ]; then
+  assert_config CONFIG_LTO_CLANG_THIN "ThinLTO"
+else
+  assert_config CONFIG_LTO_NONE "LTO_NONE"
+fi
 assert_config CONFIG_HZ_300 "HZ=300"
 assert_config CONFIG_IP_SET "网络功能扩展 (IP_SET)"
 assert_config CONFIG_MQ_IOSCHED_ADIOS "ADIOS"
@@ -376,7 +380,11 @@ if [ -f out/arch/arm64/boot/Image ]; then
   assert_ikcfg CONFIG_HZ_300
   assert_ikcfg CONFIG_TCP_CONG_BBR3
   assert_ikcfg CONFIG_IP_SET
-  assert_ikcfg CONFIG_LTO_CLANG_THIN
+  if [ "${LTO_ENABLE:-true}" = "true" ]; then
+    assert_ikcfg CONFIG_LTO_CLANG_THIN
+  else
+    assert_ikcfg CONFIG_LTO_NONE
+  fi
   assert_ikcfg CONFIG_MQ_IOSCHED_ADIOS
   assert_ikcfg CONFIG_SECTION_MISMATCH_WARN_ONLY
   assert_ikcfg CONFIG_PER_VMA_LOCK_STATS
