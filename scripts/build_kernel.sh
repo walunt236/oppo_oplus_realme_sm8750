@@ -295,13 +295,14 @@ else
   echo "  ✓ -mcpu=oryon-1（Oryon 目标）" | tee -a "$LOG_FILE"
 fi
 if [ "$AFDO_PROFILE_VALID" -eq 1 ]; then
-  if clang -fprofile-sample-use="$AFDO_PROFILE" -fprofile-sample-accurate -fdebug-info-for-profiling -mllvm -enable-fs-discriminator=true -mllvm -sample-profile-max-propagate-iterations=300 -### -c /dev/null 2>&1 | grep -qE "error|unknown|not supported"; then
+  if ! clang -fprofile-sample-use="$AFDO_PROFILE" -fprofile-sample-accurate -fdebug-info-for-profiling -mllvm -enable-fs-discriminator=true -mllvm -sample-profile-max-propagate-iterations=300 -fsyntax-only -x c /dev/null >/tmp/afdo_check.log 2>&1; then
     echo "  ✗ AutoFDO 参数不被工具链支持！" | tee -a "$LOG_FILE"
+    sed -n '1,10p' /tmp/afdo_check.log | tee -a "$LOG_FILE"
     exit 1
   else
     echo "  ✓ AutoFDO 全套（-fprofile-sample-use / -fprofile-sample-accurate / -fdebug-info-for-profiling / fs-discriminator / propagate-iterations=300）" | tee -a "$LOG_FILE"
   fi
-  if ld.lld -m aarch64elf --lto-sample-profile="$AFDO_PROFILE" -r -o /dev/null /dev/null 2>&1 | grep -qE "error|unknown|not supported"; then
+  if ! ld.lld --help 2>&1 | grep -q -- '--lto-sample-profile'; then
     echo "  ✗ --lto-sample-profile 不被链接器支持！" | tee -a "$LOG_FILE"
     exit 1
   else
