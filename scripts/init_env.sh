@@ -206,17 +206,6 @@ echo "ANDROID_VERSION=android${OEM_ANDROID_MAJOR:-16}" >> "$GITHUB_ENV"
 KERNEL_VERSION_FULL="${OEM_VERSION}.${OEM_PATCHLEVEL}.${OEM_SUBLEVEL}${OEM_EXTRAVERSION}"
 echo "KERNEL_VERSION_FULL=$KERNEL_VERSION_FULL" >> "$GITHUB_ENV"
 
-CLANG_VERSION="${CLANG_VERSION:-19}"
-CLANG_TAG=""
-if [[ "$CLANG_VERSION" != "19" ]]; then
-  CLANG_TAG="-clang${CLANG_VERSION}"
-fi
-if [[ "${CFI_ENABLE:-true}" != "true" ]]; then
-  CLANG_TAG="${CLANG_TAG}-nocfi"
-fi
-if [[ "${LTO_ENABLE:-true}" != "true" ]]; then
-  CLANG_TAG="${CLANG_TAG}-nolto"
-fi
 if [[ -n "$KERNEL_SUFFIX_INPUT" ]]; then
   KERNEL_SUFFIX="$KERNEL_SUFFIX_INPUT"
 else
@@ -228,55 +217,29 @@ else
 fi
 
 echo "KERNEL_SUFFIX=$KERNEL_SUFFIX" >> "$GITHUB_ENV"
-KERNEL_NAME_VAL="android16-${KERNEL_VERSION_FULL}-${KERNEL_SUFFIX}${CLANG_TAG}"
+KERNEL_NAME_VAL="android16-${KERNEL_VERSION_FULL}-${KERNEL_SUFFIX}"
 echo "KERNEL_NAME=$KERNEL_NAME_VAL" >> "$GITHUB_ENV"
 echo "sub_version=$OEM_SUBLEVEL" >> "$GITHUB_OUTPUT"
 echo "kernel_name=$KERNEL_NAME_VAL" >> "$GITHUB_OUTPUT"
 
 cd ..
 
-case "$CLANG_VERSION" in
-  19)
-    CLANG_DIR_NAME="Clang-19.0.0git-20240723"
-    CLANG_URL="https://github.com/ZyCromerZ/Clang/releases/download/19.0.0git-20240723-release/Clang-19.0.0git-20240723.tar.gz"
-    CLANG_ARCHIVE="clang19.tar.gz"
-    CLANG_STRIP=0
-    ;;
-  21)
-    # ZyCromerZ Clang 21（稳定分支中最新构建）
-    CLANG_DIR_NAME="Clang-21.0.0git-20250715"
-    CLANG_URL="https://github.com/ZyCromerZ/Clang/releases/download/21.0.0git-20250715-release/Clang-21.0.0git-20250715.tar.gz"
-    CLANG_ARCHIVE="clang21.tar.gz"
-    CLANG_STRIP=0
-    ;;
-  *)
-    die "不支持的 CLANG_VERSION: $CLANG_VERSION（可选 19 / 21）"
-    ;;
-esac
-
-echo "CLANG_VERSION=$CLANG_VERSION" >> "$GITHUB_ENV"
-echo "CLANG_TAG=$CLANG_TAG" >> "$GITHUB_ENV"
-echo "CLANG_DIR_NAME=$CLANG_DIR_NAME" >> "$GITHUB_ENV"
+CLANG_DIR_NAME="Clang-19.0.0git-20240723"
+CLANG_URL="https://github.com/ZyCromerZ/Clang/releases/download/19.0.0git-20240723-release/Clang-19.0.0git-20240723.tar.gz"
 
 TC_DIR="$HOME/.toolchains/$CLANG_DIR_NAME"
 BT_DIR="$HOME/.toolchains/build-tools-main"
 mkdir -p "$HOME/.toolchains"
 
-if [ ! -x "$TC_DIR/bin/clang" ]; then
-  info "检测到 Clang $CLANG_VERSION 未缓存，开始下载..."
+if [ ! -d "$TC_DIR/bin" ]; then
+  info "检测到 Clang 19 未缓存或版本更新，开始下载..."
   rm -rf "$TC_DIR"
   mkdir -p "$TC_DIR"
-  rm -f "$CLANG_ARCHIVE"*  # 清 aria2c 中断分片
-  aria2c -s16 -x16 -k1M "$CLANG_URL" -o "$CLANG_ARCHIVE" || die "Clang $CLANG_VERSION 下载失败"
-  if [ "$CLANG_STRIP" = "1" ]; then
-    tar -xzf "$CLANG_ARCHIVE" -C "$TC_DIR" --strip-components=1 || die "Clang $CLANG_VERSION 解压失败"
-  else
-    tar -xzf "$CLANG_ARCHIVE" -C "$TC_DIR" || die "Clang $CLANG_VERSION 解压失败"
-  fi
-  rm -f "$CLANG_ARCHIVE"
-  [ -x "$TC_DIR/bin/clang" ] || die "Clang $CLANG_VERSION 解压后缺少 bin/clang"
+  rm -f clang19.tar.gz*  # 清 aria2c 中断分片（曾累积 4.7G 残留）
+  aria2c -s16 -x16 -k1M "$CLANG_URL" -o clang19.tar.gz || die "Clang 19 下载失败"
+  tar -xzf clang19.tar.gz -C "$TC_DIR" && rm -f clang19.tar.gz
 else
-  info "[秒过] Clang $CLANG_VERSION 工具链已存在本地缓存，直接复用！"
+  info "[秒过] Clang 19 工具链已存在本地缓存，直接复用！"
 fi
 
 if [ ! -d "$BT_DIR/build-tools/bin" ]; then
