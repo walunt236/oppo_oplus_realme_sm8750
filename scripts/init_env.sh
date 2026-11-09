@@ -211,6 +211,9 @@ CLANG_TAG=""
 if [[ "$CLANG_VERSION" != "19" ]]; then
   CLANG_TAG="-clang${CLANG_VERSION}"
 fi
+if [[ "${CFI_ENABLE:-true}" != "true" ]]; then
+  CLANG_TAG="${CLANG_TAG}-nocfi"
+fi
 if [[ -n "$KERNEL_SUFFIX_INPUT" ]]; then
   KERNEL_SUFFIX="$KERNEL_SUFFIX_INPUT"
 else
