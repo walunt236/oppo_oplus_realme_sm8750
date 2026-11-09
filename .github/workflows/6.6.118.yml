@@ -10,24 +10,6 @@ on:
         default: 'self-hosted'
         options:
           - 'self-hosted'
-      clang_version:
-        description: '编译器版本（19=稳定，21=AOSP r563880 实验）'
-        required: true
-        type: choice
-        default: '19'
-        options:
-          - '19'
-          - '21'
-      cfi_enable:
-        description: 'CFI（关闭用于 Clang21 兼容实验）'
-        required: true
-        type: boolean
-        default: true
-      lto_enable:
-        description: 'LTO（关闭用于 Clang21 兼容实验）'
-        required: true
-        type: boolean
-        default: true
       ksu_type:
         description: 'KernelSU类型'
         required: true
@@ -127,6 +109,11 @@ on:
         required: true
         type: boolean
         default: false
+      ccache_debug:
+        description: '上传Ccache调试日志'
+        required: true
+        type: boolean
+        default: false
       afdo_mode:
         description: 'AutoFDO 模式：off=关闭 / use=使用已有采样 / generate=生成可采样内核'
         required: true
@@ -136,6 +123,11 @@ on:
           - 'off'
           - 'use'
           - 'generate'
+      kernel_suffix:
+        description: '内核后缀'
+        required: false
+        type: string
+        default: ''
       diagnosis:
         description: '诊断模式：仅生成并导出config'
         required: true
@@ -166,9 +158,6 @@ jobs:
       contents: write
     env:
       LOG_FILE: ${{ github.workspace }}/build_summary.log
-      CLANG_VERSION: ${{ inputs.clang_version }}
-      CFI_ENABLE: ${{ inputs.cfi_enable }}
-      LTO_ENABLE: ${{ inputs.lto_enable }}
       KSU_TYPE: ${{ inputs.ksu_type }}
       SUSFS_ENABLE: ${{ inputs.susfs_enable }}
       KPM_ENABLE: ${{ inputs.kpm_enable }}
@@ -185,8 +174,8 @@ jobs:
       LIBBPF_ENABLE: ${{ inputs.libbpf_enable }}
       BORE_ENABLE: ${{ inputs.bore_enable }}
       RCU_NOCB_ENABLE: ${{ inputs.rcu_nocb_enable }}
-      CCACHE_DEBUG_INPUT: 'false'
-      KERNEL_SUFFIX_INPUT: ''
+      CCACHE_DEBUG_INPUT: ${{ inputs.ccache_debug }}
+      KERNEL_SUFFIX_INPUT: ${{ inputs.kernel_suffix }}
       DIAGNOSIS: ${{ inputs.diagnosis }}
       O3_SELECTIVE: ${{ inputs.o3_selective }}
       CLEAN_BUILD: ${{ inputs.clean_build }}
