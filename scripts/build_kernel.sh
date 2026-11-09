@@ -34,9 +34,11 @@ fi
 # 构建内核配置
 cd "$GITHUB_WORKSPACE/kernel_workspace/common"
 
+CLANG_DIR_NAME="${CLANG_DIR_NAME:-Clang-19.0.0git-20240723}"
+
 load_toolchain_env() {
   export PATH="$HOME/.toolchains/${BT_DIR_NAME:?}/build-tools/bin:$PATH"
-  export PATH="$HOME/.toolchains/Clang-19.0.0git-20240723/bin:$PATH"
+  export PATH="$HOME/.toolchains/${CLANG_DIR_NAME}/bin:$PATH"
   export PATH="/usr/lib/ccache:$PATH"
 }
 
@@ -227,8 +229,8 @@ ld.lld --version
 
 # AutoFDO profile 新鲜度检测
 if [ "$AFDO_PROFILE_VALID" -eq 1 ] && [ -n "${AFDO_VMLINUX:-}" ] && [ -f "$AFDO_VMLINUX" ]; then
-  PROFDATA="$HOME/.toolchains/Clang-19.0.0git-20240723/bin/llvm-profdata"
-  NM="$HOME/.toolchains/Clang-19.0.0git-20240723/bin/llvm-nm"
+  PROFDATA="$HOME/.toolchains/${CLANG_DIR_NAME}/bin/llvm-profdata"
+  NM="$HOME/.toolchains/${CLANG_DIR_NAME}/bin/llvm-nm"
   # 去掉 ThinLTO/Clang 内部后缀（.llvm.<hash>），否则与 vmlinux 符号表对不上
   "$PROFDATA" show -sample "$AFDO_PROFILE" 2>/dev/null | grep '^Function: ' | awk '{print $2}' | sed -E 's/:.*$//; s/\.llvm\.[0-9]+$//' | LC_ALL=C sort -u > /tmp/afdo_funcs.txt || true
   "$NM" --defined-only "$AFDO_VMLINUX" 2>/dev/null | awk '$2 ~ /^[tT]$/ {print $3}' | LC_ALL=C sort -u > /tmp/vmlinux_funcs.txt || true
@@ -247,7 +249,7 @@ fi
 
 # AFDO 热函数排序表（链接期函数布局，类似 BOLT，仅改布局不改代码）
 if [ "$AFDO_PROFILE_VALID" -eq 1 ]; then
-  PROFDATA_HOT="$HOME/.toolchains/Clang-19.0.0git-20240723/bin/llvm-profdata"
+  PROFDATA_HOT="$HOME/.toolchains/${CLANG_DIR_NAME}/bin/llvm-profdata"
   HOT_TMP=/tmp/hot_symbols.txt
   HOT_RANKED=/tmp/hot_symbols.ranked
   if [ -x "$PROFDATA_HOT" ]; then
@@ -284,7 +286,7 @@ if [ "$AFDO_PROFILE_VALID" -eq 1 ]; then
   fi
 fi
 # 编译器参数官方工具链支持验证
-info "编译器参数支持验证（ZyCromerZ clang 19 官方工具链）:"
+info "编译器参数支持验证（$CLANG_DIR_NAME）:"
 if clang -mcpu=oryon-1 -### -c /dev/null 2>&1 | grep -qE "error|unknown|not supported"; then
   echo "  ✗ -mcpu=oryon-1 不被工具链支持！" | tee -a "$LOG_FILE"
   exit 1
