@@ -125,19 +125,24 @@ Run ID: $GITHUB_RUN_ID
 Commit: $GITHUB_SHA
 Time: $TIME_NOW
 Kernel Ver: $FULL_VERSION
+Profile: ${PROFILE_NAME:-unknown}
 KSU Branch: ${KSU_TYPENAME}
 KSU Ver: ${KSUVER}
 susfs: $SUSFS_ENABLE
 KPM: $KPM_ENABLE
-LZ4: on
+LZ4: ${LZ4ZSTD_ENABLE:-true}
 LZ4KD: $LZ4KD_ENABLE
 IPset: on
-BBRv3: on
+BBRv3: ${BBR3_ENABLE:-true}
 Droidspaces: $DROIDSPACES_ENABLE
-ADIOS: on
+ADIOS: ${ADIOS_ENABLE:-true}
+Sched: ${SCHED_ENABLE:-true}
+F2FS: ${F2FS_ENABLE:-true}
+BORE: ${BORE_ENABLE:-false}
 Re-Kernel: $REKERNEL_ENABLE
 BBG: $BASEBAND_GUARD
 RCU_NOCB: $RCU_NOCB_ENABLE
+O3: ${O3_SELECTIVE:-true}
 EOF
 
 rm -f ../AnyKernel3-*.zip

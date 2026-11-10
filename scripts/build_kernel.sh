@@ -107,8 +107,9 @@ assert_config CONFIG_SECTION_MISMATCH_WARN_ONLY "SECTION_MISMATCH_WARN_ONLY (mod
 assert_config CONFIG_LTO_CLANG_THIN "ThinLTO"
 assert_config CONFIG_HZ_300 "HZ=300"
 assert_config CONFIG_IP_SET "网络功能扩展 (IP_SET)"
-assert_config CONFIG_MQ_IOSCHED_ADIOS "ADIOS"
-assert_config CONFIG_TCP_CONG_BBR3 "BBRv3"
+# ADIOS / BBRv3 是可选特性：minimal 档会关掉，断言必须跟着开关走
+if [[ "${ADIOS_ENABLE:-true}" == "true" ]]; then assert_config CONFIG_MQ_IOSCHED_ADIOS "ADIOS"; fi
+if [[ "${BBR3_ENABLE:-true}" == "true" ]]; then assert_config CONFIG_TCP_CONG_BBR3 "BBRv3"; fi
 assert_config CONFIG_PER_VMA_LOCK_STATS "per-VMA lock 统计"
 assert_config CONFIG_IOMMU_DEFAULT_DMA_STRICT "IOMMU 严格模式"
 
@@ -370,10 +371,10 @@ if [ -f out/arch/arm64/boot/Image ]; then
   assert_ikcfg CONFIG_ZRAM_MEMORY_TRACKING
   if [ "$AFDO_PROFILE_VALID" -eq 1 ]; then assert_ikcfg CONFIG_AUTOFDO_CLANG; fi
   assert_ikcfg CONFIG_HZ_300
-  assert_ikcfg CONFIG_TCP_CONG_BBR3
+  if [[ "${BBR3_ENABLE:-true}" == "true" ]]; then assert_ikcfg CONFIG_TCP_CONG_BBR3; fi
   assert_ikcfg CONFIG_IP_SET
   assert_ikcfg CONFIG_LTO_CLANG_THIN
-  assert_ikcfg CONFIG_MQ_IOSCHED_ADIOS
+  if [[ "${ADIOS_ENABLE:-true}" == "true" ]]; then assert_ikcfg CONFIG_MQ_IOSCHED_ADIOS; fi
   assert_ikcfg CONFIG_SECTION_MISMATCH_WARN_ONLY
   assert_ikcfg CONFIG_PER_VMA_LOCK_STATS
   grep -qF "CONFIG_LOCALVERSION=\"${LOCALVER:-}\"" <<< "$IKCFG_TEXT" || die "Image 内嵌 LOCALVERSION 与预期不符（期望 ${LOCALVER:-}），产物配置陈旧，中止"

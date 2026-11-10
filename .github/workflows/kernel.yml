@@ -3,13 +3,15 @@ name: oneplus13 内核编译
 on:
   workflow_dispatch:
     inputs:
-      runner_type:
-        description: '编译机'
+      profile:
+        description: '配置档：stable=当前默认 / minimal=关掉所有可选特性（二分定位） / custom=改 configs/profiles/custom.env'
         required: true
         type: choice
-        default: 'self-hosted'
+        default: 'stable'
         options:
-          - 'self-hosted'
+          - 'stable'
+          - 'minimal'
+          - 'custom'
       ksu_type:
         description: 'KernelSU类型'
         required: true
@@ -21,99 +23,6 @@ on:
           - 'ksunext'
           - 'ksu'
           - 'none'
-      susfs_enable:
-        description: '集成susfs'
-        required: true
-        type: boolean
-        default: true
-      kpm_enable:
-        description: '集成kpm'
-        required: true
-        type: choice
-        default: 'false'
-        options:
-          - 'false'
-          - 'builtin'
-          - 'kpn'
-      lz4kd_enable:
-        description: '集成LZ4KD补丁'
-        required: true
-        type: boolean
-        default: true
-      droidspaces_enable:
-        description: '集成Droidspaces容器支持'
-        required: true
-        type: choice
-        default: 'false'
-        options:
-          - 'false'
-          - 'standard'
-          - 'extend'
-      rekernel_enable:
-        description: 'Re-Kernel支持'
-        required: true
-        type: boolean
-        default: false
-      baseband_guard:
-        description: '基带保护'
-        required: true
-        type: boolean
-        default: false
-      adios_enable:
-        description: '集成ADIOS I/O调度器'
-        required: true
-        type: boolean
-        default: true
-      nvhe_enable:
-        description: 'KVM NVHE AutoFDO兼容'
-        required: true
-        type: boolean
-        default: true
-      bbr3_enable:
-        description: '集成BBRv3'
-        required: true
-        type: boolean
-        default: true
-      sched_enable:
-        description: '调度器优化'
-        required: true
-        type: boolean
-        default: true
-      lz4zstd_enable:
-        description: '集成lz4/zstd'
-        required: true
-        type: boolean
-        default: true
-      f2fs_enable:
-        description: 'f2fs优化'
-        required: true
-        type: boolean
-        default: true
-      bore_enable:
-        description: 'BORE 调度器（实验，开机默认不接管）'
-        required: false
-        type: boolean
-        default: false
-      libbpf_enable:
-        description: 'libbpf兼容修正'
-        required: true
-        type: boolean
-        default: true
-      rcu_nocb_enable:
-        description: 'RCU_NOCB_CPU'
-        required: true
-        type: boolean
-        default: true
-      ccache_update:
-        description: '更新ccache缓存'
-        required: true
-        type: boolean
-        default: false
-      ccache_debug:
-        description: '上传Ccache调试日志'
-        required: true
-        type: boolean
-        default: false
       afdo_mode:
         description: 'AutoFDO 模式：off=关闭 / use=使用已有采样 / generate=生成可采样内核'
         required: true
@@ -123,6 +32,15 @@ on:
           - 'off'
           - 'use'
           - 'generate'
+      ccache_mode:
+        description: 'ccache：keep=保留 / reset=先清缓存 / debug=保留并上传调试日志'
+        required: true
+        type: choice
+        default: 'keep'
+        options:
+          - 'keep'
+          - 'reset'
+          - 'debug'
       kernel_suffix:
         description: '内核后缀'
         required: false
@@ -133,11 +51,6 @@ on:
         required: true
         type: boolean
         default: false
-      o3_selective:
-        description: 'O3'
-        required: true
-        type: boolean
-        default: true
       clean_build:
         description: '强制干净构建'
         required: true
@@ -151,7 +64,7 @@ concurrency:
 
 jobs:
   build:
-    runs-on: ${{ inputs.runner_type }}
+    runs-on: self-hosted
     timeout-minutes: 180
     permissions:
       # 构建不向仓库回写任何内容（同步源码走公开 HTTPS 读），
@@ -160,30 +73,15 @@ jobs:
       contents: read
     env:
       LOG_FILE: ${{ github.workspace }}/build_summary.log
+      PROFILE_NAME: ${{ inputs.profile }}
       KSU_TYPE: ${{ inputs.ksu_type }}
-      SUSFS_ENABLE: ${{ inputs.susfs_enable }}
-      KPM_ENABLE: ${{ inputs.kpm_enable }}
-      LZ4KD_ENABLE: ${{ inputs.lz4kd_enable }}
-      DROIDSPACES_ENABLE: ${{ inputs.droidspaces_enable }}
-      REKERNEL_ENABLE: ${{ inputs.rekernel_enable }}
-      BASEBAND_GUARD: ${{ inputs.baseband_guard }}
-      ADIOS_ENABLE: ${{ inputs.adios_enable }}
-      NVHE_ENABLE: ${{ inputs.nvhe_enable }}
-      BBR3_ENABLE: ${{ inputs.bbr3_enable }}
-      SCHED_ENABLE: ${{ inputs.sched_enable }}
-      LZ4ZSTD_ENABLE: ${{ inputs.lz4zstd_enable }}
-      F2FS_ENABLE: ${{ inputs.f2fs_enable }}
-      LIBBPF_ENABLE: ${{ inputs.libbpf_enable }}
-      BORE_ENABLE: ${{ inputs.bore_enable }}
-      RCU_NOCB_ENABLE: ${{ inputs.rcu_nocb_enable }}
-      CCACHE_DEBUG_INPUT: ${{ inputs.ccache_debug }}
-      KERNEL_SUFFIX_INPUT: ${{ inputs.kernel_suffix }}
-      DIAGNOSIS: ${{ inputs.diagnosis }}
-      O3_SELECTIVE: ${{ inputs.o3_selective }}
-      CLEAN_BUILD: ${{ inputs.clean_build }}
       AFDO_MODE: ${{ inputs.afdo_mode }}
       AFDO_ENABLE: ${{ inputs.afdo_mode != 'off' }}
       AFDO_GENERATE: ${{ inputs.afdo_mode == 'generate' }}
+      CCACHE_DEBUG_INPUT: ${{ inputs.ccache_mode == 'debug' }}
+      KERNEL_SUFFIX_INPUT: ${{ inputs.kernel_suffix }}
+      DIAGNOSIS: ${{ inputs.diagnosis }}
+      CLEAN_BUILD: ${{ inputs.clean_build }}
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: 同步仓库代码
@@ -200,6 +98,24 @@ jobs:
           git reset --hard FETCH_HEAD
           git clean -fdq -e kernel_workspace
 
+      # 特性开关（SUSFS/LZ4KD/ADIOS/BORE…）不进派发表单，统一放 configs/profiles/<name>.env，
+      # 这样「这个内核是什么」跟着 commit 走，派发时只需要选「这次要做什么」
+      - name: 载入配置档
+        run: |
+          set -euo pipefail
+          PROFILE_FILE="configs/profiles/${PROFILE_NAME}.env"
+          if [ ! -f "$PROFILE_FILE" ]; then
+            echo "::error::找不到配置档 $PROFILE_FILE"
+            exit 1
+          fi
+          echo "[INFO] 载入配置档: $PROFILE_NAME ($PROFILE_FILE)"
+          grep -vE '^[[:space:]]*(#|$)' "$PROFILE_FILE" | while IFS='=' read -r KEY VAL; do
+            KEY="${KEY//[[:space:]]/}"
+            VAL="${VAL//[[:space:]]/}"
+            echo "$KEY=$VAL" >> "$GITHUB_ENV"
+            echo "  $KEY=$VAL"
+          done
+
       - name: 代码静态检查
         run: |
           cd "$GITHUB_WORKSPACE"
@@ -212,7 +128,7 @@ jobs:
         run: bash "$GITHUB_WORKSPACE/scripts/ccache_setup.sh"
 
       - name: 清除旧 ccache 缓存
-        if: inputs.ccache_update
+        if: inputs.ccache_mode == 'reset'
         run: |
           if gh cache delete "${{ env.CCACHE_REAL_KEY }}-${{ runner.os }}-${{ github.ref_name }}" -R "${{ github.repository }}"; then
             echo "[INFO] 旧 ccache 缓存删除成功"
@@ -282,7 +198,7 @@ jobs:
               echo "[INFO] AutoFDO 生成模式：本次内核带 -fdebug-info-for-profiling，用于采集" | tee -a "$LOG_FILE"
               echo "[INFO] 设备采样（刷入本内核后执行，勿在 AFDO 内核上采样）：" | tee -a "$LOG_FILE"
               echo "[INFO]   simpleperf record -a -o /data/local/tmp/perf_data.data --duration 1800" | tee -a "$LOG_FILE"
-              echo "[INFO] 采完把 perf.data 放到编译机: scripts/afdo_collect.sh perf.data ..." | tee -a "$LOG_FILE"
+              echo "[INFO]  采完把 perf.data 放到编译机: scripts/afdo_collect.sh perf.data ..." | tee -a "$LOG_FILE"
               echo "[INFO] 详见 docs/AUTOFDO.md" | tee -a "$LOG_FILE"
               ;;
             *)
@@ -336,7 +252,7 @@ jobs:
           retention-days: 7
 
       - name: 上传 Ccache 调试日志
-        if: ${{ always() && inputs.ccache_debug && !inputs.diagnosis }}
+        if: ${{ always() && inputs.ccache_mode == 'debug' && !inputs.diagnosis }}
         uses: actions/upload-artifact@v7
         with:
           name: ccache-debug-log

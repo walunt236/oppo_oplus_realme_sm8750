@@ -1,17 +1,13 @@
 #!/usr/bin/env bash
 # libbpf 模块：新 glibc 下 strchr() const 兼容修正
 # 来源：scripts/apply_patches.sh 原第 562-578 行（原样搬迁）
-# 开关：LIBBPF_ENABLE=true（原块无开关，本次新增；默认 true，保持原行为）
+# 开关：无（始终执行）。这是构建兼容性修复：新 glibc 下不做修正会直接编译失败，
+#       且脚本自带 const const 自愈逻辑，重复执行安全。
 set -euo pipefail
 
 WS="${GITHUB_WORKSPACE:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 export GITHUB_WORKSPACE="$WS"
 source "$WS/scripts/common.sh"
-
-if [[ "${LIBBPF_ENABLE:-true}" != "true" ]]; then
-  info "[LIBBPF] 未启用，跳过"
-  exit 0
-fi
 
 cd "$WS/kernel_workspace/common"
 
