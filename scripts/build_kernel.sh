@@ -233,7 +233,7 @@ if [ "$AFDO_PROFILE_VALID" -eq 1 ] && [ -n "${AFDO_VMLINUX:-}" ] && [ -f "$AFDO_
   NM="$HOME/.toolchains/${CLANG_DIR_NAME}/bin/llvm-nm"
   # 去掉 ThinLTO/Clang 内部后缀（.llvm.<hash>），否则与 vmlinux 符号表对不上
   "$PROFDATA" show -sample "$AFDO_PROFILE" 2>/dev/null | grep '^Function: ' | awk '{print $2}' | sed -E 's/:.*$//; s/\.llvm\.[0-9]+$//' | LC_ALL=C sort -u > /tmp/afdo_funcs.txt || true
-  "$NM" --defined-only "$AFDO_VMLINUX" 2>/dev/null | awk '$2 ~ /^[tT]$/ {print $3}' | LC_ALL=C sort -u > /tmp/vmlinux_funcs.txt || true
+  "$NM" --defined-only "$AFDO_VMLINUX" 2>/dev/null | awk '$2 ~ /^[tT]$/ {print $3}' | sed -E 's/\.llvm\.[0-9]+$//' | LC_ALL=C sort -u > /tmp/vmlinux_funcs.txt || true
   MATCH=$(LC_ALL=C comm -12 /tmp/afdo_funcs.txt /tmp/vmlinux_funcs.txt | wc -l || true)
   TOTAL=$(wc -l < /tmp/afdo_funcs.txt)
   if [ "$TOTAL" -gt 0 ]; then
