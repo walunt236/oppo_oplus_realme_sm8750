@@ -247,44 +247,9 @@ elif [ "$AFDO_PROFILE_VALID" -eq 1 ]; then
   warn "AutoFDO 新鲜度防线未启用（AFDO_VMLINUX 未配置或文件不存在）"
 fi
 
-# AFDO 热函数排序表（链接期函数布局，类似 BOLT，仅改布局不改代码）
-if [ "$AFDO_PROFILE_VALID" -eq 1 ]; then
-  PROFDATA_HOT="$HOME/.toolchains/${CLANG_DIR_NAME}/bin/llvm-profdata"
-  HOT_TMP=/tmp/hot_symbols.txt
-  HOT_RANKED=/tmp/hot_symbols.ranked
-  if [ -x "$PROFDATA_HOT" ]; then
-    # 1) 去掉 .llvm.<hash> 后缀；2) 同一基础符号的多个克隆按计数求和；
-    # 3) 按热度排序后只保留合法符号名
-    "$PROFDATA_HOT" show -sample "$AFDO_PROFILE" 2>/dev/null | awk '
-      /^Function: / {
-        name=$2; sub(/:.*$/, "", name);
-        sub(/\.llvm\.[0-9]+$/, "", name);
-        cnt=$3; sub(/,.*$/, "", cnt);
-        if (name != "" && cnt+0 > 0) sum[name]+=cnt;
-      }
-      END { for (n in sum) print sum[n], n }' \
-      | LC_ALL=C sort -nr | awk '{print $2}' \
-      | grep -E '^[A-Za-z_][A-Za-z0-9_.$]*$' > "$HOT_RANKED" || true
-  fi
-  if [ ! -s "$HOT_RANKED" ]; then
-    grep -E '^[A-Za-z_][A-Za-z0-9_.$]*:[0-9]+$' "$AFDO_PROFILE" 2>/dev/null \
-      | LC_ALL=C sort -t: -k2 -nr | cut -d: -f1 \
-      | sed -E 's/\.llvm\.[0-9]+$//' | awk '!seen[$0]++' > "$HOT_RANKED" || true
-  fi
-  # 若已有 vmlinux 符号表，过滤掉被内联/消除的符号，减少
-  # "symbol ordering file: no such symbol" 警告并提高排序命中率
-  if [ -s "$HOT_RANKED" ] && [ -s /tmp/vmlinux_funcs.txt ]; then
-    head -6000 "$HOT_RANKED" | LC_ALL=C grep -F -x -f /tmp/vmlinux_funcs.txt | head -3000 > "$HOT_TMP" || true
-  elif [ -s "$HOT_RANKED" ]; then
-    head -3000 "$HOT_RANKED" > "$HOT_TMP"
-  fi
-  if [ -s "$HOT_TMP" ]; then
-    export HOTFILE="$HOT_TMP"
-    info "AFDO 热函数排序表: $(wc -l < "$HOTFILE") 个符号（链接期排序，已剥离 .llvm 后缀）"
-  else
-    warn "AFDO 排序表生成失败（profile 文本格式不识别），跳过链接期排序"
-  fi
-fi
+# AFDO 链接期符号排序已移除：6.6/QCOM 树上最终 vmlinux 链接不稳定，
+# 保留 AutoFDO 编译期 profile 优化；链接期排序收益很小，不值得冒构建失败风险。
+
 # 编译器参数官方工具链支持验证
 info "编译器参数支持验证（ZyCromerZ $CLANG_DIR_NAME）:"
 if clang -mcpu=oryon-1 -### -c /dev/null 2>&1 | grep -qE "error|unknown|not supported"; then
