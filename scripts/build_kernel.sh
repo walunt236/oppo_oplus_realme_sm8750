@@ -328,7 +328,9 @@ make -j${BUILD_JOBS} LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccac
 
 if [ -f out/vmlinux ]; then
   info "MFS 诊断：文本段尺寸"
-  readelf -SW out/vmlinux | grep -E "\.text\.(split|unlikely|hot)" | tee -a "$LOG_FILE" || true
+  READELF="$HOME/.toolchains/${CLANG_DIR_NAME}/bin/llvm-readelf"
+  [ -x "$READELF" ] || READELF=readelf
+  "$READELF" -SW out/vmlinux 2>&1 | grep -E '\.text\.(split|unlikely|hot)' | tee -a "$LOG_FILE" || true
 fi
 assert_ikcfg() {
   grep -q "^${1}=y" <<< "$IKCFG_TEXT" || die "Image 内嵌配置缺少 ${1}，产物配置陈旧，中止"
