@@ -28,7 +28,5 @@ jobs:
       - name: 脚本与配置检查
         run: bash scripts/lint.sh
 
-      # shellcheck 目前仅提示：存量脚本还有告警，先积累基线，稳定后再改为阻断
-      - name: shellcheck（提示）
-        continue-on-error: true
+      - name: shellcheck
         run: shellcheck -S warning -x scripts/*.sh scripts/features/*.sh

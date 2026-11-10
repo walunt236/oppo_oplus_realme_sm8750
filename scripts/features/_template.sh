@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2034  # 模板占位变量，复制成正式模块后才会被引用
 set -u
 if [[ "${FEATURE_ENABLE:-false}" != "true" ]]; then
   echo "[FEATURE] 未启用，跳过"
