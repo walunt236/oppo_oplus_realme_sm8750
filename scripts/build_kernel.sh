@@ -326,16 +326,7 @@ if [ "$AFDO_PROFILE_VALID" -eq 1 ]; then
 fi
 make -j${BUILD_JOBS} LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" LD="$(pwd)/ld-wrapper" HOSTLD=ld.lld O=out KCFLAGS="-O3 -Wno-error $KCFLAGS_EXTRA $AFDO_CFLAGS" $AFDO_MAKE_ARGS Image
 
-if [ -f out/vmlinux ]; then
-  info "MFS 诊断：文本段尺寸"
-  READELF="$HOME/.toolchains/${CLANG_DIR_NAME}/bin/llvm-readelf"
-  [ -x "$READELF" ] || READELF=readelf
-  "$READELF" -SW out/vmlinux > /tmp/mfs_sections.log 2>&1 || true
-  grep -E 'text\.(split|unlikely|hot)' /tmp/mfs_sections.log | tee -a "$LOG_FILE" || {
-    echo "  [WARN] 未匹配到文本段，readelf 输出前 8 行：" | tee -a "$LOG_FILE"
-    head -n 8 /tmp/mfs_sections.log | tee -a "$LOG_FILE"
-  }
-fi
+
 assert_ikcfg() {
   grep -q "^${1}=y" <<< "$IKCFG_TEXT" || die "Image 内嵌配置缺少 ${1}，产物配置陈旧，中止"
 }
