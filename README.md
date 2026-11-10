@@ -40,7 +40,7 @@
 | `sched_enable` | bool | `true` | NEXT_BUDDY / HRTICK / SIS_PROP 等 |
 | `bbr3_enable` | bool | `true` | BBRv3 拥塞控制 |
 | `adios_enable` | bool | `true` | ADIOS I/O 调度器 |
-| `bore_enable` | bool | `false` | BORE 调度器（实验，开机即接管） |
+| `bore_enable` | bool | `true` | BORE 调度器 |
 | `rcu_nocb_enable` | bool | `true` | RCU_NOCB_CPU + RCU_LAZY |
 | `droidspaces_enable` | choice | `false` | `false` / `standard` / `extend`（容器支持） |
 
