@@ -64,6 +64,9 @@ bash "$GITHUB_WORKSPACE/scripts/features/f2fs.sh"
 # libbpf：新 glibc 下 strchr() const 兼容修正（模块化）
 bash "$GITHUB_WORKSPACE/scripts/features/libbpf.sh"
 
+# AutoFDO MFS experiment (branch only)
+bash "$GITHUB_WORKSPACE/scripts/features/autofdo_mfs.sh"
+
 touch /tmp/sync_failed.list "$PENDING_SYNC"
 sort -u "$PENDING_SYNC" /tmp/sync_failed.list -o "$PENDING_SYNC"
 # BORE（默认关闭，BORE_ENABLE=true 才应用）
