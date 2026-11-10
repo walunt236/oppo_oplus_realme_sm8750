@@ -140,9 +140,9 @@ def main():
     for a, line in zip(sorted_addrs, lines):
         try:
             obj = json.loads(line)
-            syms = obj.get("Symbol") or []
-            if syms:
-                sym = syms[0]
+            jsyms = obj.get("Symbol") or []
+            if jsyms:
+                sym = jsyms[0]
                 loc[a] = (int(sym.get("Line", 0)), int(sym.get("Discriminator", 0)))
         except Exception:
             continue
