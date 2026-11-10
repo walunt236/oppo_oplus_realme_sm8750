@@ -17,6 +17,7 @@
 import bisect
 import collections
 import glob
+import json
 import os
 import re
 import struct
@@ -133,15 +134,18 @@ def main():
 
     sorted_addrs = sorted(leaf_ips)
     inp = "\n".join("0x%x" % a for a in sorted_addrs) + "\n"
-    res = subprocess.run([symb, "--obj=" + vmlinux], input=inp, text=True, capture_output=True)
+    res = subprocess.run([symb, "--obj=" + vmlinux, "--output-style=JSON"], input=inp, text=True, capture_output=True)
     lines = [l for l in res.stdout.splitlines() if l.strip()]
     loc = {}
-    k = 0
-    for a in sorted_addrs:
-        if k + 1 >= len(lines):
-            break
-        loc[a] = lines[k + 1]
-        k += 2
+    for a, line in zip(sorted_addrs, lines):
+        try:
+            obj = json.loads(line)
+            syms = obj.get("Symbol") or []
+            if syms:
+                sym = syms[0]
+                loc[a] = (int(sym.get("Line", 0)), int(sym.get("Discriminator", 0)))
+        except Exception:
+            continue
 
     func_tot = collections.Counter()
     func_lines = collections.defaultdict(collections.Counter)
@@ -153,16 +157,21 @@ def main():
             continue
         cnt = leaf_ips[a]
         func_tot[fn] += cnt
-        m = re.search(r":(\d+)(?::\d+)?$", loc.get(a, ""))
-        if m and int(m.group(1)) > 0:
-            func_lines[fn][int(m.group(1))] += cnt
+        loc_info = loc.get(a)
+        if loc_info:
+            line_no, disc = loc_info
+            if line_no > 0:
+                func_lines[fn][(line_no, disc)] += cnt
 
     os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
     with open(out_path, "w", encoding="utf-8") as f:
         for fn, tot in func_tot.most_common():
             f.write("%s:%d:%d\n" % (fn, tot, tot))
-            for line_no, c in sorted(func_lines[fn].items()):
-                f.write(" %d: %d\n" % (line_no, c))
+            for (line_no, disc), c in sorted(func_lines[fn].items()):
+                if disc > 0:
+                    f.write(" %d.%d: %d\n" % (line_no, disc, c))
+                else:
+                    f.write(" %d: %d\n" % (line_no, c))
 
     nailed = sum(func_tot.values())
     print("[INFO] 已写出 %s" % out_path)
