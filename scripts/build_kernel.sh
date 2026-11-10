@@ -325,6 +325,11 @@ if [ "$AFDO_PROFILE_VALID" -eq 1 ]; then
   AFDO_MAKE_ARGS="CLANG_AUTOFDO_PROFILE=$AFDO_PROFILE"
 fi
 make -j${BUILD_JOBS} LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" LD="$(pwd)/ld-wrapper" HOSTLD=ld.lld O=out KCFLAGS="-O3 -Wno-error $KCFLAGS_EXTRA $AFDO_CFLAGS" $AFDO_MAKE_ARGS Image
+
+if [ -f out/vmlinux ]; then
+  info "MFS 诊断：文本段尺寸"
+  readelf -SW out/vmlinux | grep -E "\.text\.(split|unlikely|hot)" | tee -a "$LOG_FILE" || true
+fi
 assert_ikcfg() {
   grep -q "^${1}=y" <<< "$IKCFG_TEXT" || die "Image 内嵌配置缺少 ${1}，产物配置陈旧，中止"
 }
