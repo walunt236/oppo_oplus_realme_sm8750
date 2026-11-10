@@ -2,7 +2,8 @@
 
 每个功能一个脚本：scripts/features/<name>.sh
 资产目录：other_patch/<name>/
-开关：取自 configs/profiles/<profile>.env（派发时只选档位），键名与取值由 scripts/check_profiles.py 校验；
+开关：由派发表单的「分类开关」展开成 <NAME>_ENABLE（映射集中在 .github/workflows/kernel.yml
+      的「展开分类开关」步骤），同类功能共用一个下拉，不再逐个布尔勾选；
       构建兼容性 / 环境适配类模块不给开关（例如 nvhe、libbpf，始终执行）
 
 ## 当前状态

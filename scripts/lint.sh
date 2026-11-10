@@ -47,11 +47,6 @@ if ! python3 scripts/check_configs.py; then
   fail=1
 fi
 
-# 4b) 配置档：键名、取值与完整性（缺键会静默退回脚本默认值，很难发现）
-if ! python3 scripts/check_profiles.py; then
-  fail=1
-fi
-
 # 5) 工作流 YAML 解析（未装 PyYAML 时跳过，不阻塞本地检查）
 if python3 -c 'import yaml' 2>/dev/null; then
   if ! python3 - << 'PYEOF'

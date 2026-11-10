@@ -125,7 +125,6 @@ Run ID: $GITHUB_RUN_ID
 Commit: $GITHUB_SHA
 Time: $TIME_NOW
 Kernel Ver: $FULL_VERSION
-Profile: ${PROFILE_NAME:-unknown}
 KSU Branch: ${KSU_TYPENAME}
 KSU Ver: ${KSUVER}
 susfs: $SUSFS_ENABLE
