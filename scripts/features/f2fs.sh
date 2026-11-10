@@ -15,8 +15,6 @@ fi
 
 cd "$WS/kernel_workspace/common"
 
-# 已知问题：原第 533 行 F2FS_ATGC_PATCH 的字符串在源脚本中即已损坏
-# （值为 '" + D + "GITHUB_WORKSPACE/...'），本次只做原样搬迁，未修改；详见交付报告。
 # ---- 原块开始（apply_patches.sh 第 530-561 行，原样搬迁，勿改） ----
 # f2fs：默认启用 ATGC（年龄阈值 GC）与 GC_MERGE（GC 写合并）
 # 两者在 6.6.143 里已存在，但只能通过挂载参数开启；而挂载参数由 ROM 的 fstab 决定。

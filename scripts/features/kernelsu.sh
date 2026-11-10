@@ -38,7 +38,8 @@ if [[ "$KSU_TYPE" == "sukisu" || "$KSU_TYPE" == "resukisu" ]]; then
   info "配置 ReSukiSU..."
   sync_repo "https://github.com/ReSukiSU/ReSukiSU.git" KernelSU main
   link_ksu_kernel KernelSU
-  echo 'CONFIG_KSU_FULL_NAME_FORMAT="%TAG_NAME%-%COMMIT_SHA%@walunt236"' >> ./common/arch/arm64/configs/gki_defconfig
+  KSU_OWNER="${GITHUB_REPOSITORY_OWNER:-walunt236}"
+  echo "CONFIG_KSU_FULL_NAME_FORMAT=\"%TAG_NAME%-%COMMIT_SHA%@${KSU_OWNER}\"" >> ./common/arch/arm64/configs/gki_defconfig
   cd ./KernelSU
   KSU_COMMITS=$(ksu_commit_count ReSukiSU/ReSukiSU main)
   KSU_COMMITS=${KSU_COMMITS:-0}

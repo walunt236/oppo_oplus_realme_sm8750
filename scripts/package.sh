@@ -57,7 +57,7 @@ fi
 cd kernel_workspace
 if [ -d AnyKernel3/.git ]; then
   info "AnyKernel3 仓库已存在，增量同步..."
-  git -C AnyKernel3 remote set-url origin https://github.com/walunt236/AnyKernel3 2>/dev/null || true
+  git -C AnyKernel3 remote set-url origin "$AK3_REPO" 2>/dev/null || true
   if glr -C AnyKernel3 fetch --depth=1 origin && git -C AnyKernel3 reset --hard FETCH_HEAD; then
     :
   else
@@ -65,7 +65,7 @@ if [ -d AnyKernel3/.git ]; then
   fi
 else
   rm -rf AnyKernel3
-  retry "AnyKernel3 克隆" 8 5 glr clone https://github.com/walunt236/AnyKernel3 --depth=1 AnyKernel3 || die "AnyKernel3 克隆失败，终止打包"
+  retry "AnyKernel3 克隆" 8 5 glr clone "$AK3_REPO" --depth=1 AnyKernel3 || die "AnyKernel3 克隆失败，终止打包"
 fi
 cd AnyKernel3
 git clean -ffdqx

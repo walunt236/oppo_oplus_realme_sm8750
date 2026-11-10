@@ -16,6 +16,7 @@
 """
 import bisect
 import collections
+import glob
 import os
 import re
 import struct
@@ -27,10 +28,13 @@ KERN_SPAN = 0x40000000             # 内核文本地址窗口
 
 
 def find_toolchain():
-    cand = [
-        os.path.expanduser("~/.toolchains/Clang-19.0.0git-20240723/bin"),
-        "/opt/toolchains/bin",
-    ]
+    cand = []
+    clang_dir = os.environ.get("CLANG_DIR_NAME")
+    if clang_dir:
+        cand.append(os.path.expanduser(f"~/.toolchains/{clang_dir}/bin"))
+    cand.append("/opt/toolchains/bin")
+    # 未指定 CLANG_DIR_NAME 时，按字典序倒序兜底（最新版本优先）
+    cand += sorted(glob.glob(os.path.expanduser("~/.toolchains/Clang-*/bin")), reverse=True)
     for d in cand:
         if os.path.isfile(os.path.join(d, "llvm-nm")) and os.path.isfile(os.path.join(d, "llvm-symbolizer")):
             return d

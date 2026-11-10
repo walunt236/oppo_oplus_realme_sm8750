@@ -6,7 +6,7 @@
 
 ## 当前状态
 
-apply_patches.sh：428 → 217 → 68 行；剩余内容为调用顺序与状态衔接。
+apply_patches.sh：428 → 217 → 73 行；剩余内容为调用顺序与状态衔接。
 
 ### 已抽取（脚本）
 
@@ -26,17 +26,18 @@ apply_patches.sh：428 → 217 → 68 行；剩余内容为调用顺序与状态
 | 调度器 | features/sched.sh | SCHED_ENABLE（默认 true） | NEXT_BUDDY / HRTICK / SIS_PROP / CACHE_HOT_BUDDY / LB_MIN |
 | f2fs | features/f2fs.sh | F2FS_ENABLE（默认 true） | ATGC 路径 bug 已修（0aae0936） |
 | libbpf | features/libbpf.sh | LIBBPF_ENABLE（默认 true） | — |
-| Kcompressd | features/kcompressd.sh | KCOMPRESSD_ENABLE（默认 false） | 6.12 补丁回移 6.6；kfifo 改指针规避头文件循环；失败打印 .rej 后继续 |
+| BORE | features/bore.sh | BORE_ENABLE（默认 false） | 7.0.0 补丁 + 7.0.1r2 审计修复；sched_bore 默认 1（开机即接管） |
+| WildKernels 小补丁 | features/wild_extra.sh | WILD_EXTRA_ENABLE（默认 true） | 扫描顺序 / clear_page 16B 对齐 / cpufreq unlikely |
 | HMBIRD/Polly | features/hmbird.sh | 无（始终执行） | 原 87-152；Overwriter/Defconfig/18 patch/EnablePOLLY/mm_* 原样搬迁，子脚本内 cd common |
 | 收尾 | features/finalize.sh | 无（始终执行） | 原 11-27、154-187；count_rejs 助手随块，Unicode/lz4 CFLAGS/dma-buf 回滚/reject 汇总 |
 
 ### 已抽取（配置片段）
 
-configs/features/ 下 15 个片段：adios、droidspaces、droidspaces_extend、hz300、
+configs/features/ 下 17 个片段：adios、bore、droidspaces、droidspaces_extend、hz300、
 kernel_tunables、ksu_susfs、lz4kd、misc_toggles、namespaces、netfilter、
-perf_toggles、rcu、tmpfs、ubsan_oem、zram
+perf_toggles、rcu、tmpfs、ubsan_oem、zram、zsmalloc_chain
 
-config_inject.sh：587 → 136 行，配置指令序列与改造前逐行一致（151 条）。
+config_inject.sh：587 → 143 行，配置指令序列与改造前逐行一致（151 条）。
 
 ### 未抽取（有意保留）
 
@@ -44,7 +45,7 @@ apply_patches.sh 的功能块已全部模块化；以下仅剩 config_inject.sh 
 
 | 块 | 位置 | 原因 |
 |---|---|---|
-| 混合配置块（echo+sed+AFDO 交错） | config_inject.sh L43-62 | 拆开风险大 |
+| 混合配置块（HEADERS_INSTALL sed + AFDO 条件 + SECTION_MISMATCH） | config_inject.sh L43-52 | 拆开风险大 |
 
 ## 约定
 

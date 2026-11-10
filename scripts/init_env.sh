@@ -45,7 +45,7 @@ else
   info "ccache 已存在: $(ccache --version | head -1)"
 fi
 
-OEM_URL="https://github.com/OnePlusOSS/android_kernel_common_oneplus_sm8750.git"
+OEM_URL="${OEM_REPO}"
 OEM_BRANCH=$(git -c http.proxy= ls-remote --symref "$OEM_URL" HEAD 2>/dev/null | sed -n 's|^ref: refs/heads/\([^\t]*\).*|\1|p' | sed -n '1p') || true
 [ -n "$OEM_BRANCH" ] || die "无法从 $OEM_URL 获取默认分支，中止构建"
 info "一加内核默认分支: $OEM_BRANCH"
@@ -81,7 +81,7 @@ else
   rm -rf vendor_modules
   info "首次克隆设备树与私有驱动仓库（后台并行）..."
   ( retry "vendor_modules 克隆" 3 5 glr clone --depth=1 \
-      https://github.com/OnePlusOSS/android_kernel_modules_and_devicetree_oneplus_sm8750.git \
+      "$OEM_VENDOR_REPO" \
       -b "$OEM_BRANCH" \
       vendor_modules || exit 1
   ) &
@@ -209,7 +209,7 @@ echo "KERNEL_VERSION_FULL=$KERNEL_VERSION_FULL" >> "$GITHUB_ENV"
 if [[ -n "$KERNEL_SUFFIX_INPUT" ]]; then
   KERNEL_SUFFIX="$KERNEL_SUFFIX_INPUT"
 else
-  KERNEL_SUFFIX="oneplus13-4k-aosp16"
+  KERNEL_SUFFIX="${KERNEL_SUFFIX_DEFAULT}"
   if [[ -n "$UPSTREAM_SUBLEVEL" ]] && [[ "$UPSTREAM_SUBLEVEL" != "0" ]]; then
     KERNEL_VERSION_FULL="${KERNEL_VERSION_FULL}_${UPSTREAM_SUBLEVEL}"
     echo "KERNEL_VERSION_FULL=$KERNEL_VERSION_FULL" >> "$GITHUB_ENV"
@@ -224,22 +224,21 @@ echo "kernel_name=$KERNEL_NAME_VAL" >> "$GITHUB_OUTPUT"
 
 cd ..
 
-CLANG_DIR_NAME="Clang-19.0.0git-20240723"
-CLANG_URL="https://github.com/ZyCromerZ/Clang/releases/download/19.0.0git-20240723-release/Clang-19.0.0git-20240723.tar.gz"
-
+# 工具链身份（目录名/版本/下载地址）统一在 build.env 定义
 TC_DIR="$HOME/.toolchains/$CLANG_DIR_NAME"
-BT_DIR="$HOME/.toolchains/build-tools-main"
+BT_DIR="$HOME/.toolchains/$BUILD_TOOLS_DIR_NAME"
 mkdir -p "$HOME/.toolchains"
+CLANG_TGZ="clang-${CLANG_RELEASE}.tar.gz"
 
 if [ ! -d "$TC_DIR/bin" ]; then
-  info "检测到 Clang 19 未缓存或版本更新，开始下载..."
+  info "检测到工具链未缓存或版本变化（$CLANG_DIR_NAME），开始下载..."
   rm -rf "$TC_DIR"
   mkdir -p "$TC_DIR"
-  rm -f clang19.tar.gz*  # 清 aria2c 中断分片（曾累积 4.7G 残留）
-  aria2c -s16 -x16 -k1M "$CLANG_URL" -o clang19.tar.gz || die "Clang 19 下载失败"
-  tar -xzf clang19.tar.gz -C "$TC_DIR" && rm -f clang19.tar.gz
+  rm -f clang*.tar.gz*  # 清 aria2c 中断分片（曾累积 4.7G 残留）
+  aria2c -s16 -x16 -k1M "$CLANG_URL" -o "$CLANG_TGZ" || die "工具链下载失败（$CLANG_DIR_NAME）"
+  tar -xzf "$CLANG_TGZ" -C "$TC_DIR" && rm -f "$CLANG_TGZ"
 else
-  info "[秒过] Clang 19 工具链已存在本地缓存，直接复用！"
+  info "[秒过] 工具链已存在本地缓存（$CLANG_DIR_NAME），直接复用！"
 fi
 
 if [ ! -d "$BT_DIR/build-tools/bin" ]; then
@@ -254,7 +253,7 @@ if [ ! -d "$BT_DIR/build-tools/bin" ]; then
 else
   info "[秒过] build-tools 工具链已存在本地缓存，直接复用！"
 fi
-echo "BT_DIR_NAME=build-tools-main" >> "$GITHUB_ENV"
+echo "BT_DIR_NAME=$BUILD_TOOLS_DIR_NAME" >> "$GITHUB_ENV"
 rm -f "$BT_DIR/build-tools/bin/bison"
 
 
