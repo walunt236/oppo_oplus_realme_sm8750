@@ -15,9 +15,9 @@ info "分支：$GITHUB_REF_NAME"
 
 # 磁盘预检（在克隆 3G 内核源码之前做，避免跑到一半 ENOSPC）
 if [[ "${CLEAN_BUILD:-false}" == "true" ]]; then
-  need_disk 30 "全量构建（clean_build=true）"
+  need_disk 20 "全量构建（clean_build=true）"
 else
-  need_disk 6 "增量构建"
+  need_disk 3 "增量构建"
 fi
 
 cd "$GITHUB_WORKSPACE"
