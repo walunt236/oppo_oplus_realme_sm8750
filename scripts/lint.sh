@@ -47,26 +47,44 @@ if ! python3 scripts/check_configs.py; then
   fail=1
 fi
 
-# 5) 工作流 YAML 解析（未装 PyYAML 时跳过，不阻塞本地检查）
+# 5) 工作流 YAML 解析 + 内联 run: 块的 bash 语法
 if python3 -c 'import yaml' 2>/dev/null; then
   if ! python3 - << 'PYEOF'
-import glob, sys, yaml
+import glob, os, subprocess, sys, tempfile, yaml
 
 bad = 0
 for f in sorted(glob.glob('.github/workflows/*.yml')):
     try:
-        yaml.safe_load(open(f, encoding='utf-8'))
+        doc = yaml.safe_load(open(f, encoding='utf-8'))
         print(f"[lint] YAML OK: {f}")
     except Exception as e:
         print(f"[lint][ERROR] YAML 解析失败: {f}: {e}")
         bad = 1
+        continue
+
+    # 内联 run: 是 bash，但 bash -n 不会扫到 YAML 里，单独抽出来检查
+    for jname, job in (doc.get('jobs') or {}).items():
+        for step in (job.get('steps') or []):
+            run = step.get('run')
+            if not isinstance(run, str):
+                continue
+            with tempfile.NamedTemporaryFile('w', suffix='.sh', delete=False,
+                                             encoding='utf-8', newline='\n') as tmp:
+                tmp.write(run)
+                path = tmp.name
+            r = subprocess.run(['bash', '-n', path], capture_output=True, text=True)
+            if r.returncode != 0:
+                print(f"[lint][ERROR] {f} :: {jname} :: {step.get('name')}: run 块语法错误")
+                print(r.stderr.strip())
+                bad = 1
+            os.unlink(path)
 sys.exit(bad)
 PYEOF
   then
     fail=1
   fi
 else
-  echo "[lint][SKIP] 未安装 PyYAML，跳过工作流 YAML 校验"
+  echo "[lint][SKIP] 未安装 PyYAML，跳过工作流 YAML 与 run 块校验"
 fi
 
 [ "$fail" -eq 0 ] && echo "[lint] 全部通过"
