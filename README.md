@@ -7,32 +7,8 @@
 ## 快速开始
 
 1. 启动 `kbuild` 虚拟机并确认 runner 在线（离线时任务会一直排队，不会失败）
-2. Actions → **oneplus13 内核编译** → Run workflow
+2. Actions → **oneplus13 内核编译** → Run workflow，按需改输入后运行
 3. 构建过程打印到 `build_summary.log`，产物见下方「产物」
-
-## 输入参数（15 个分类开关）
-
-同类功能聚在一个下拉里，选中哪个就开启上面列出的那组特性；展开结果会逐行打印在构建日志的「展开分类开关」一节，可直接核对。
-
-| 分类 | 选项 | 开启什么 |
-|---|---|---|
-| `root` | `none` / `ksu` / `resukisu` / `sukisu` / `ksunext` | 对应的 KernelSU 方案，`none` 完全不集成 |
-| `susfs` | `on` / `off` | SUSFS 全套（sus_path、sus_mount、sus_kstat、open_redirect、spoof_uname…），需 `root≠none` |
-| `kpm` | `off` / `builtin` / `kpn` | `builtin`：SukiSU、ReSukiSU 内置 KPM；`kpn`：构建后用 KP-N 修补 Image |
-| `sched` | `stock` / `tuned` / `tuned_bore` | `tuned`：NEXT_BUDDY + HRTICK + SIS_PROP + CACHE_HOT_BUDDY + LB_MIN；`tuned_bore`：以上全部 + BORE 调度器（开机接管） |
-| `io` | `stock` / `adios` / `f2fs` / `adios_f2fs` | `adios`：ADIOS I/O 调度器；`f2fs`：ATGC + GC_MERGE + GC 三项调优（紧急休眠 50ms、拥塞 6ms、fsync 批量 20）；`adios_f2fs`：两者都开 |
-| `compression` | `stock` / `lz4zstd` / `lz4kd` / `lz4zstd_lz4kd` | `lz4zstd`：LZ4 1.10 NEON + zstd；`lz4kd`：LZ4KD（zram 多级压缩）；`lz4zstd_lz4kd`：两者都开 |
-| `net` | `stock` / `bbr3` | BBRv3 拥塞控制 |
-| `mem` | `stock` / `rcu_nocb` | RCU_NOCB_CPU + RCU_LAZY（回调卸载到专属线程） |
-| `container` | `off` / `standard` / `extend` | `standard`：命名空间 + SysV IPC + ntsync + netfilter 扩展；`extend`：再加 BT_HCIVHCI、STATIC_USERMODEHELPER 等 |
-| `security` | `off` / `baseband` / `rekernel` / `both` | `baseband`：基带保护 LSM；`rekernel`：Re-Kernel |
-| `opt` | `stock` / `o3_polly` | `lib`、`crypto` 加 `-O3` + Polly 向量化 |
-| `afdo` | `off` / `use` / `generate` | `use`：用已有采样优化；`generate`：产出可采样内核（采完再用 `use` 重建） |
-| `mode` | `build` / `clean` / `diagnosis` | `build`：增量；`clean`：删 `out/` 全量重建；`diagnosis`：只跑源码同步+补丁+配置注入并导出 `.config`，不编译不打包 |
-| `ccache` | `keep` / `reset` / `debug` | `reset`：先删旧缓存；`debug`：保留并上传调试日志 |
-| `suffix` | 字符串 | 内核后缀，留空用 `build.env` 的默认值 |
-
-所有 `stock` / `off` 选项都表示「保持上游行为」，不会注入任何补丁或配置。
 
 ## 产物
 
@@ -42,25 +18,59 @@
 | VM `~/share/out/history/` | 按 run 号归档 | 最近 5 个 |
 | Actions run 页 artifact | 同一个 zip + `build_summary.log` | 7 天 |
 
-zip 里的 `ak3.log` 记录 commit、KSU 版本和全部特性开关，回滚时不用猜。
+## 输入参数
+
+### KernelSU
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `ksu_type` | choice | `ksu` | `resukisu` / `sukisu` / `ksunext` / `ksu` / `none` |
+| `susfs_enable` | bool | `true` | 需 `ksu_type != none`；关闭时写 `CONFIG_KSU_SUSFS=n` |
+| `kpm_enable` | choice | `false` | `false` / `builtin`（仅 sukisu、resukisu）/ `kpn` |
+| `rekernel_enable` | bool | `false` | Re-Kernel 支持 |
+| `baseband_guard` | bool | `false` | 基带保护 LSM |
+
+### 内核特性
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `lz4kd_enable` | bool | `true` | LZ4KD 压缩补丁 |
+| `lz4zstd_enable` | bool | `true` | LZ4 1.10 + NEON / zstd |
+| `f2fs_enable` | bool | `true` | ATGC/GC_MERGE 默认值 + GC 调优 |
+| `sched_enable` | bool | `true` | NEXT_BUDDY / HRTICK / SIS_PROP 等 |
+| `bbr3_enable` | bool | `true` | BBRv3 拥塞控制 |
+| `adios_enable` | bool | `true` | ADIOS I/O 调度器 |
+| `bore_enable` | bool | `false` | BORE 调度器（实验，开机即接管） |
+| `rcu_nocb_enable` | bool | `true` | RCU_NOCB_CPU + RCU_LAZY |
+| `droidspaces_enable` | choice | `false` | `false` / `standard` / `extend`（容器支持） |
+
+### 构建控制
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `afdo_mode` | choice | `use` | `off` / `use`（用已有采样）/ `generate`（出可采样内核） |
+| `o3_selective` | bool | `true` | `lib`、`crypto` 加 `-O3` + Polly |
+| `clean_build` | bool | `false` | 删 `out/` 全量重建 |
+| `diagnosis` | bool | `false` | 跑完源码同步+补丁+配置注入后导出 `.config`，不编译不打包 |
+| `ccache_update` | bool | `false` | 先删旧 ccache 缓存 |
+| `ccache_debug` | bool | `false` | 上传 ccache 调试日志 |
+| `kernel_suffix` | string | 空 | 自定义内核后缀，空则用 `build.env` 的默认值 |
 
 ## 常用组合
 
-| 场景 | 选法 |
+| 场景 | 参数 |
 |---|---|
-| 日常稳定版 | 默认值（`sched=tuned`、`io=adios_f2fs`、`compression=lz4zstd_lz4kd`、`net=bbr3`、`mem=rcu_nocb`） |
-| 只验证补丁/配置能否应用 | `mode = diagnosis`（不编译，几分钟） |
-| 试 BORE 调度器 | `sched = tuned_bore` |
-| 定位「是不是补丁导致的问题」 | 所有分类选 `stock` / `off`，再逐个打开 |
-| 改了编译器或 defconfig 后重建 | `mode = clean`，必要时再 `ccache = reset` |
-| 采 AutoFDO 样本 | 先 `afdo = generate` 构建并刷入，采样后 `afdo = use` |
+| 日常稳定版 | 全部默认 |
+| 只验证补丁/配置能否应用 | `diagnosis = true`（不编译，几分钟） |
+| 改了编译器或 defconfig 后重建 | `clean_build = true`，必要时再加 `ccache_update = true` |
+| 采 AutoFDO 样本 | 先 `afdo_mode = generate` 构建并刷入，采样后 `afdo_mode = use` |
 
 ## 目录
 
 | 目录 | 职责 |
 |---|---|
 | `.github/workflows/` | `kernel.yml` 主编排、`lint.yml` 静态检查、两个清理工作流 |
-| `scripts/` | 构建阶段脚本，`build.env` 是参数（含工具链版本、仓库地址）的唯一来源 |
+| `scripts/` | 构建阶段脚本，`build.env` 是所有参数（含工具链版本、仓库地址）的唯一来源 |
 | `scripts/features/` | 18 个功能模块，顺序固定，见 [功能模块清单](scripts/features/README.md) |
 | `configs/features/` | 17 个 defconfig 配置片段 |
 | `other_patch/` | 随仓库版本化的补丁（外部的在构建时拉取） |

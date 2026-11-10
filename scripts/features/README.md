@@ -2,9 +2,7 @@
 
 每个功能一个脚本：scripts/features/<name>.sh
 资产目录：other_patch/<name>/
-开关：由派发表单的「分类开关」展开成 <NAME>_ENABLE（映射集中在 .github/workflows/kernel.yml
-      的「展开分类开关」步骤），同类功能共用一个下拉，不再逐个布尔勾选；
-      构建兼容性 / 环境适配类模块不给开关（例如 nvhe、libbpf，始终执行）
+开关：优先沿用原工作流变量；原块无开关的新增 <NAME>_ENABLE（默认 true，保持原行为）
 
 ## 当前状态
 

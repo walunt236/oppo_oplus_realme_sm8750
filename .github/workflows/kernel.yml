@@ -3,108 +3,102 @@ name: oneplus13 内核编译
 on:
   workflow_dispatch:
     inputs:
-      root:
-        description: 'Root 方案：none=不集成 / ksu=KernelSU / resukisu=ReSukiSU / sukisu=SukiSU / ksunext=KernelSU-Next'
+      ksu_type:
+        description: 'KernelSU类型'
         required: true
         type: choice
         default: 'ksu'
         options:
-          - 'none'
-          - 'ksu'
           - 'resukisu'
           - 'sukisu'
           - 'ksunext'
-      susfs:
-        description: '隐藏：on=集成 SUSFS（sus_path/sus_mount/open_redirect 等全套，需 root≠none）/ off=不集成'
+          - 'ksu'
+          - 'none'
+      susfs_enable:
+        description: '集成susfs'
+        required: true
+        type: boolean
+        default: true
+      kpm_enable:
+        description: '集成kpm'
         required: true
         type: choice
-        default: 'on'
+        default: 'false'
         options:
-          - 'on'
-          - 'off'
-      kpm:
-        description: 'KPM：off=不集成 / builtin=SukiSU、ReSukiSU 内置 KPM / kpn=构建后用 KP-N 修补 Image'
-        required: true
-        type: choice
-        default: 'off'
-        options:
-          - 'off'
+          - 'false'
           - 'builtin'
           - 'kpn'
-      sched:
-        description: '调度器：stock=不改 / tuned=NEXT_BUDDY+HRTICK+SIS_PROP+CACHE_HOT_BUDDY+LB_MIN / tuned_bore=以上全部+BORE 调度器（开机接管）'
+      lz4kd_enable:
+        description: '集成LZ4KD补丁'
+        required: true
+        type: boolean
+        default: true
+      droidspaces_enable:
+        description: '集成Droidspaces容器支持'
         required: true
         type: choice
-        default: 'tuned'
+        default: 'false'
         options:
-          - 'stock'
-          - 'tuned'
-          - 'tuned_bore'
-      io:
-        description: '存储 IO：stock=不改 / adios=ADIOS I/O 调度器 / f2fs=ATGC+GC_MERGE+GC 三项调优 / adios_f2fs=两者都开'
-        required: true
-        type: choice
-        default: 'adios_f2fs'
-        options:
-          - 'stock'
-          - 'adios'
-          - 'f2fs'
-          - 'adios_f2fs'
-      compression:
-        description: '压缩：stock=内核自带 / lz4zstd=LZ4 1.10 NEON+zstd / lz4kd=LZ4KD（zram 多级压缩）/ lz4zstd_lz4kd=两者都开'
-        required: true
-        type: choice
-        default: 'lz4zstd_lz4kd'
-        options:
-          - 'stock'
-          - 'lz4zstd'
-          - 'lz4kd'
-          - 'lz4zstd_lz4kd'
-      net:
-        description: '网络：stock=不改 / bbr3=BBRv3 拥塞控制（含 tcp_bbr3 默认可用）'
-        required: true
-        type: choice
-        default: 'bbr3'
-        options:
-          - 'stock'
-          - 'bbr3'
-      mem:
-        description: '内存：stock=不改 / rcu_nocb=RCU_NOCB_CPU + RCU_LAZY（把回调卸载到专属线程）'
-        required: true
-        type: choice
-        default: 'rcu_nocb'
-        options:
-          - 'stock'
-          - 'rcu_nocb'
-      container:
-        description: '容器：off=不集成 / standard=命名空间+SysV IPC+ntsync / extend=再加 BT_HCIVHCI、STATIC_USERMODEHELPER 等'
-        required: true
-        type: choice
-        default: 'off'
-        options:
-          - 'off'
+          - 'false'
           - 'standard'
           - 'extend'
-      security:
-        description: '安全：off=不集成 / baseband=基带保护 LSM / rekernel=Re-Kernel / both=两者都开'
+      rekernel_enable:
+        description: 'Re-Kernel支持'
         required: true
-        type: choice
-        default: 'off'
-        options:
-          - 'off'
-          - 'baseband'
-          - 'rekernel'
-          - 'both'
-      opt:
-        description: '编译优化：stock=默认 / o3_polly=lib、crypto 加 -O3 + Polly 向量化'
+        type: boolean
+        default: false
+      baseband_guard:
+        description: '基带保护'
         required: true
-        type: choice
-        default: 'o3_polly'
-        options:
-          - 'stock'
-          - 'o3_polly'
-      afdo:
-        description: 'AutoFDO：off=关闭 / use=使用已有采样 / generate=生成可采样内核（采样后再用 use 重建）'
+        type: boolean
+        default: false
+      adios_enable:
+        description: '集成ADIOS I/O调度器'
+        required: true
+        type: boolean
+        default: true
+      bbr3_enable:
+        description: '集成BBRv3'
+        required: true
+        type: boolean
+        default: true
+      sched_enable:
+        description: '调度器优化'
+        required: true
+        type: boolean
+        default: true
+      lz4zstd_enable:
+        description: '集成lz4/zstd'
+        required: true
+        type: boolean
+        default: true
+      f2fs_enable:
+        description: 'f2fs优化'
+        required: true
+        type: boolean
+        default: true
+      bore_enable:
+        description: 'BORE 调度器（实验，开机默认不接管）'
+        required: false
+        type: boolean
+        default: false
+      rcu_nocb_enable:
+        description: 'RCU_NOCB_CPU'
+        required: true
+        type: boolean
+        default: true
+      ccache_update:
+        description: '更新ccache缓存'
+        required: true
+        type: boolean
+        default: false
+      ccache_debug:
+        description: '上传Ccache调试日志'
+        required: true
+        type: boolean
+        default: false
+      afdo_mode:
+        description: 'AutoFDO 模式：off=关闭 / use=使用已有采样 / generate=生成可采样内核'
         required: true
         type: choice
         default: 'use'
@@ -112,29 +106,26 @@ on:
           - 'off'
           - 'use'
           - 'generate'
-      mode:
-        description: '构建模式：build=增量编译 / clean=删 out 全量重建 / diagnosis=只跑源码同步+补丁+配置注入并导出 config（不编译不打包）'
-        required: true
-        type: choice
-        default: 'build'
-        options:
-          - 'build'
-          - 'clean'
-          - 'diagnosis'
-      ccache:
-        description: 'ccache：keep=保留缓存 / reset=先删旧缓存 / debug=保留并上传调试日志'
-        required: true
-        type: choice
-        default: 'keep'
-        options:
-          - 'keep'
-          - 'reset'
-          - 'debug'
-      suffix:
-        description: '内核后缀（留空用 build.env 默认值）'
+      kernel_suffix:
+        description: '内核后缀'
         required: false
         type: string
         default: ''
+      diagnosis:
+        description: '诊断模式：同步源码+打补丁+注入配置后导出 config，不编译不打包'
+        required: true
+        type: boolean
+        default: false
+      o3_selective:
+        description: 'O3'
+        required: true
+        type: boolean
+        default: true
+      clean_build:
+        description: '强制干净构建'
+        required: true
+        type: boolean
+        default: false
 
 # 同一工作流的构建串行排队，避免两次派发争用同一台 self-hosted 编译机
 concurrency:
@@ -152,24 +143,28 @@ jobs:
       contents: read
     env:
       LOG_FILE: ${{ github.workspace }}/build_summary.log
-      ROOT: ${{ inputs.root }}
-      SUSFS: ${{ inputs.susfs }}
-      KPM: ${{ inputs.kpm }}
-      SCHED: ${{ inputs.sched }}
-      IO: ${{ inputs.io }}
-      COMPRESSION: ${{ inputs.compression }}
-      NET: ${{ inputs.net }}
-      MEM: ${{ inputs.mem }}
-      CONTAINER: ${{ inputs.container }}
-      SECURITY: ${{ inputs.security }}
-      OPT: ${{ inputs.opt }}
-      AFDO_MODE: ${{ inputs.afdo }}
-      AFDO_ENABLE: ${{ inputs.afdo != 'off' }}
-      AFDO_GENERATE: ${{ inputs.afdo == 'generate' }}
-      BUILD_MODE: ${{ inputs.mode }}
-      CCACHE_MODE: ${{ inputs.ccache }}
-      CCACHE_DEBUG_INPUT: ${{ inputs.ccache == 'debug' }}
-      KERNEL_SUFFIX_INPUT: ${{ inputs.suffix }}
+      KSU_TYPE: ${{ inputs.ksu_type }}
+      SUSFS_ENABLE: ${{ inputs.susfs_enable }}
+      KPM_ENABLE: ${{ inputs.kpm_enable }}
+      LZ4KD_ENABLE: ${{ inputs.lz4kd_enable }}
+      DROIDSPACES_ENABLE: ${{ inputs.droidspaces_enable }}
+      REKERNEL_ENABLE: ${{ inputs.rekernel_enable }}
+      BASEBAND_GUARD: ${{ inputs.baseband_guard }}
+      ADIOS_ENABLE: ${{ inputs.adios_enable }}
+      BBR3_ENABLE: ${{ inputs.bbr3_enable }}
+      SCHED_ENABLE: ${{ inputs.sched_enable }}
+      LZ4ZSTD_ENABLE: ${{ inputs.lz4zstd_enable }}
+      F2FS_ENABLE: ${{ inputs.f2fs_enable }}
+      BORE_ENABLE: ${{ inputs.bore_enable }}
+      RCU_NOCB_ENABLE: ${{ inputs.rcu_nocb_enable }}
+      CCACHE_DEBUG_INPUT: ${{ inputs.ccache_debug }}
+      KERNEL_SUFFIX_INPUT: ${{ inputs.kernel_suffix }}
+      DIAGNOSIS: ${{ inputs.diagnosis }}
+      O3_SELECTIVE: ${{ inputs.o3_selective }}
+      CLEAN_BUILD: ${{ inputs.clean_build }}
+      AFDO_MODE: ${{ inputs.afdo_mode }}
+      AFDO_ENABLE: ${{ inputs.afdo_mode != 'off' }}
+      AFDO_GENERATE: ${{ inputs.afdo_mode == 'generate' }}
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: 同步仓库代码
@@ -186,114 +181,6 @@ jobs:
           git reset --hard FETCH_HEAD
           git clean -fdq -e kernel_workspace
 
-      # 分类开关 -> 脚本实际读取的 *_ENABLE 变量。
-      # 每个大类只做一个选择，展开结果会逐行打印在日志里，便于核对本次到底开了什么。
-      - name: 展开分类开关
-        run: |
-          set -euo pipefail
-          emit() { printf '%s=%s\n' "$1" "$2" >> "$GITHUB_ENV"; echo "  $1=$2"; }
-          die() { echo "::error::$1"; exit 1; }
-
-          case "$ROOT" in
-            none)     emit KSU_TYPE none ;;
-            ksu)      emit KSU_TYPE ksu ;;
-            resukisu) emit KSU_TYPE resukisu ;;
-            sukisu)   emit KSU_TYPE sukisu ;;
-            ksunext)  emit KSU_TYPE ksunext ;;
-            *) die "未知 root: $ROOT" ;;
-          esac
-
-          case "$SUSFS" in
-            on)  emit SUSFS_ENABLE true ;;
-            off) emit SUSFS_ENABLE false ;;
-            *) die "未知 susfs: $SUSFS" ;;
-          esac
-
-          case "$KPM" in
-            off)     emit KPM_ENABLE false ;;
-            builtin) emit KPM_ENABLE builtin ;;
-            kpn)     emit KPM_ENABLE kpn ;;
-            *) die "未知 kpm: $KPM" ;;
-          esac
-
-          emit SCHED_ENABLE false
-          emit BORE_ENABLE false
-          case "$SCHED" in
-            stock)      : ;;
-            tuned)      emit SCHED_ENABLE true ;;
-            tuned_bore) emit SCHED_ENABLE true; emit BORE_ENABLE true ;;
-            *) die "未知 sched: $SCHED" ;;
-          esac
-
-          emit ADIOS_ENABLE false
-          emit F2FS_ENABLE false
-          case "$IO" in
-            stock)      : ;;
-            adios)      emit ADIOS_ENABLE true ;;
-            f2fs)       emit F2FS_ENABLE true ;;
-            adios_f2fs) emit ADIOS_ENABLE true; emit F2FS_ENABLE true ;;
-            *) die "未知 io: $IO" ;;
-          esac
-
-          emit LZ4ZSTD_ENABLE false
-          emit LZ4KD_ENABLE false
-          case "$COMPRESSION" in
-            stock)          : ;;
-            lz4zstd)        emit LZ4ZSTD_ENABLE true ;;
-            lz4kd)          emit LZ4KD_ENABLE true ;;
-            lz4zstd_lz4kd)  emit LZ4ZSTD_ENABLE true; emit LZ4KD_ENABLE true ;;
-            *) die "未知 compression: $COMPRESSION" ;;
-          esac
-
-          emit BBR3_ENABLE false
-          case "$NET" in
-            stock) : ;;
-            bbr3)  emit BBR3_ENABLE true ;;
-            *) die "未知 net: $NET" ;;
-          esac
-
-          emit RCU_NOCB_ENABLE false
-          case "$MEM" in
-            stock)    : ;;
-            rcu_nocb) emit RCU_NOCB_ENABLE true ;;
-            *) die "未知 mem: $MEM" ;;
-          esac
-
-          case "$CONTAINER" in
-            off)      emit DROIDSPACES_ENABLE false ;;
-            standard) emit DROIDSPACES_ENABLE standard ;;
-            extend)   emit DROIDSPACES_ENABLE extend ;;
-            *) die "未知 container: $CONTAINER" ;;
-          esac
-
-          emit BASEBAND_GUARD false
-          emit REKERNEL_ENABLE false
-          case "$SECURITY" in
-            off)      : ;;
-            baseband) emit BASEBAND_GUARD true ;;
-            rekernel) emit REKERNEL_ENABLE true ;;
-            both)     emit BASEBAND_GUARD true; emit REKERNEL_ENABLE true ;;
-            *) die "未知 security: $SECURITY" ;;
-          esac
-
-          emit O3_SELECTIVE false
-          case "$OPT" in
-            stock)    : ;;
-            o3_polly) emit O3_SELECTIVE true ;;
-            *) die "未知 opt: $OPT" ;;
-          esac
-
-          emit CLEAN_BUILD false
-          emit DIAGNOSIS false
-          case "$BUILD_MODE" in
-            build)     : ;;
-            clean)     emit CLEAN_BUILD true ;;
-            diagnosis) emit DIAGNOSIS true ;;
-            *) die "未知 mode: $BUILD_MODE" ;;
-          esac
-
-          echo "[INFO] 分类开关展开完成"
-
       - name: 代码静态检查
         run: |
           cd "$GITHUB_WORKSPACE"
@@ -306,7 +193,7 @@ jobs:
         run: bash "$GITHUB_WORKSPACE/scripts/ccache_setup.sh"
 
       - name: 清除旧 ccache 缓存
-        if: inputs.ccache == 'reset'
+        if: inputs.ccache_update
         run: |
           if gh cache delete "${{ env.CCACHE_REAL_KEY }}-${{ runner.os }}-${{ github.ref_name }}" -R "${{ github.repository }}"; then
             echo "[INFO] 旧 ccache 缓存删除成功"
@@ -376,7 +263,7 @@ jobs:
               echo "[INFO] AutoFDO 生成模式：本次内核带 -fdebug-info-for-profiling，用于采集" | tee -a "$LOG_FILE"
               echo "[INFO] 设备采样（刷入本内核后执行，勿在 AFDO 内核上采样）：" | tee -a "$LOG_FILE"
               echo "[INFO]   simpleperf record -a -o /data/local/tmp/perf_data.data --duration 1800" | tee -a "$LOG_FILE"
-              echo "[INFO]   采完把 perf.data 放到编译机: scripts/afdo_collect.sh perf.data ..." | tee -a "$LOG_FILE"
+              echo "[INFO] 采完把 perf.data 放到编译机: scripts/afdo_collect.sh perf.data ..." | tee -a "$LOG_FILE"
               echo "[INFO] 详见 docs/AUTOFDO.md" | tee -a "$LOG_FILE"
               ;;
             *)
@@ -386,14 +273,14 @@ jobs:
           esac
 
       - name: 编译内核
-        if: ${{ inputs.mode != 'diagnosis' }}
+        if: ${{ !inputs.diagnosis }}
         run: |
           set -o pipefail
           : > "$HOME/kbuild.log"
           bash "$GITHUB_WORKSPACE/scripts/build_kernel.sh" 2>&1 | tee -a "$HOME/kbuild.log"
 
       - name: 上传诊断配置文本
-        if: inputs.mode == 'diagnosis'
+        if: inputs.diagnosis
         uses: actions/upload-artifact@v7
         with:
           name: kernel-config-${{ github.run_id }}
@@ -412,14 +299,14 @@ jobs:
           echo "=================================================="
 
       - name: 打包发布
-        if: ${{ inputs.mode != 'diagnosis' }}
+        if: ${{ !inputs.diagnosis }}
         id: create_zip
         run: bash "$GITHUB_WORKSPACE/scripts/package.sh"
 
       # 产物原本只存在 VM 磁盘上（保留 5 个历史包），VM 磁盘损坏即全部丢失；
       # 这里再上传一份到 GitHub，7 天后自动过期
       - name: 上传安装包
-        if: ${{ inputs.mode != 'diagnosis' }}
+        if: ${{ !inputs.diagnosis }}
         uses: actions/upload-artifact@v7
         with:
           name: ${{ steps.create_zip.outputs.ak3name }}
@@ -430,7 +317,7 @@ jobs:
           retention-days: 7
 
       - name: 上传 Ccache 调试日志
-        if: ${{ always() && inputs.ccache == 'debug' && inputs.mode != 'diagnosis' }}
+        if: ${{ always() && inputs.ccache_debug && !inputs.diagnosis }}
         uses: actions/upload-artifact@v7
         with:
           name: ccache-debug-log
