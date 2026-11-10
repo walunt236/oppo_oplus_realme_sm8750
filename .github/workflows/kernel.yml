@@ -78,10 +78,10 @@ on:
         type: boolean
         default: true
       bore_enable:
-        description: 'BORE 调度器（实验，开机默认不接管）'
+        description: 'BORE 调度器（默认启用）'
         required: false
         type: boolean
-        default: false
+        default: true
       rcu_nocb_enable:
         description: 'RCU_NOCB_CPU'
         required: true
