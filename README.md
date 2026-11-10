@@ -10,6 +10,49 @@
 2. Actions → **oneplus13 内核编译** → Run workflow，按需改输入后运行
 3. 构建过程打印到 `build_summary.log`，产物见下方「产物」
 
+## 输入参数
+
+派发表单只有 7 项：**这次要做什么**。**这个内核是什么**（14 个特性开关）在 `configs/profiles/` 里，跟着 commit 走。
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `profile` | choice | `stable` | 特性配置档：`stable` / `minimal` / `custom`，见下节 |
+| `ksu_type` | choice | `ksu` | `resukisu` / `sukisu` / `ksunext` / `ksu` / `none` |
+| `afdo_mode` | choice | `use` | `off` / `use`（用已有采样）/ `generate`（出可采样内核） |
+| `ccache_mode` | choice | `keep` | `keep` / `reset`（先清缓存）/ `debug`（保留并上传日志） |
+| `kernel_suffix` | string | 空 | 自定义内核后缀，空则用 `build.env` 的默认值 |
+| `diagnosis` | bool | `false` | 跑完源码同步+补丁+配置注入后导出 `.config`，不编译不打包 |
+| `clean_build` | bool | `false` | 删 `out/` 全量重建 |
+
+## 特性配置档
+
+| 档位 | 用途 |
+|---|---|
+| `stable` | 当前基线，与历史默认值逐项一致 |
+| `minimal` | 关掉所有可选特性，用来二分定位「问题是我加的补丁引入的，还是上游本来就有」 |
+| `custom` | 临时试验：改 `configs/profiles/custom.env` 后提交，派发时选 `custom` |
+
+配置档内容（`configs/profiles/*.env`）：
+
+```bash
+SUSFS_ENABLE=true          # KernelSU + SUSFS
+KPM_ENABLE=false           # false / builtin（仅 sukisu、resukisu）/ kpn
+LZ4KD_ENABLE=true          # LZ4KD 压缩补丁
+DROIDSPACES_ENABLE=false   # false / standard / extend
+REKERNEL_ENABLE=false
+BASEBAND_GUARD=false
+ADIOS_ENABLE=true
+BBR3_ENABLE=true
+SCHED_ENABLE=true          # NEXT_BUDDY / HRTICK / SIS_PROP 等
+LZ4ZSTD_ENABLE=true        # LZ4 1.10 NEON + zstd
+F2FS_ENABLE=true           # ATGC/GC_MERGE + GC 调优
+BORE_ENABLE=false          # 实验，开机即接管
+RCU_NOCB_ENABLE=true
+O3_SELECTIVE=true          # lib、crypto 加 -O3 + Polly
+```
+
+改特性 = 改一个文件 + 提交。`scripts/check_profiles.py` 会在 lint 时校验键名、取值和完整性（缺键会静默退回脚本各自的默认值，而各脚本默认值并不一致）。
+
 ## 产物
 
 | 位置 | 内容 | 保留 |
@@ -18,54 +61,17 @@
 | VM `~/share/out/history/` | 按 run 号归档 | 最近 5 个 |
 | Actions run 页 artifact | 同一个 zip + `build_summary.log` | 7 天 |
 
-## 输入参数
-
-### KernelSU
-
-| 参数 | 类型 | 默认 | 说明 |
-|---|---|---|---|
-| `ksu_type` | choice | `ksu` | `resukisu` / `sukisu` / `ksunext` / `ksu` / `none` |
-| `susfs_enable` | bool | `true` | 需 `ksu_type != none`；关闭时写 `CONFIG_KSU_SUSFS=n` |
-| `kpm_enable` | choice | `false` | `false` / `builtin`（仅 sukisu、resukisu）/ `kpn` |
-| `rekernel_enable` | bool | `false` | Re-Kernel 支持 |
-| `baseband_guard` | bool | `false` | 基带保护 LSM |
-
-### 内核特性
-
-| 参数 | 类型 | 默认 | 说明 |
-|---|---|---|---|
-| `lz4kd_enable` | bool | `true` | LZ4KD 压缩补丁 |
-| `lz4zstd_enable` | bool | `true` | LZ4 1.10 + NEON / zstd |
-| `f2fs_enable` | bool | `true` | ATGC/GC_MERGE 默认值 + GC 调优 |
-| `sched_enable` | bool | `true` | NEXT_BUDDY / HRTICK / SIS_PROP 等 |
-| `bbr3_enable` | bool | `true` | BBRv3 拥塞控制 |
-| `adios_enable` | bool | `true` | ADIOS I/O 调度器 |
-| `bore_enable` | bool | `false` | BORE 调度器（实验，开机即接管） |
-| `nvhe_enable` | bool | `true` | KVM NVHE 的 AutoFDO 元数据兼容 |
-| `rcu_nocb_enable` | bool | `true` | RCU_NOCB_CPU + RCU_LAZY |
-| `libbpf_enable` | bool | `true` | 新 glibc 下 `strchr()` const 兼容 |
-| `droidspaces_enable` | choice | `false` | `false` / `standard` / `extend`（容器支持） |
-
-### 构建控制
-
-| 参数 | 类型 | 默认 | 说明 |
-|---|---|---|---|
-| `afdo_mode` | choice | `use` | `off` / `use`（用已有采样）/ `generate`（出可采样内核） |
-| `o3_selective` | bool | `true` | `lib`、`crypto` 加 `-O3` + Polly |
-| `clean_build` | bool | `false` | 删 `out/` 全量重建 |
-| `diagnosis` | bool | `false` | 跑完源码同步+补丁+配置注入后导出 `.config`，不编译不打包 |
-| `ccache_update` | bool | `false` | 先删旧 ccache 缓存 |
-| `ccache_debug` | bool | `false` | 上传 ccache 调试日志 |
-| `kernel_suffix` | string | 空 | 自定义内核后缀，空则用 `build.env` 的默认值 |
-| `runner_type` | choice | `self-hosted` | 目前仅 `self-hosted` |
+zip 里的 `ak3.log` 记录了 Profile、commit、KSU 版本与全部特性开关，回滚时不用猜。
 
 ## 常用组合
 
 | 场景 | 参数 |
 |---|---|
-| 日常稳定版 | 全部默认 |
+| 日常稳定版 | 全部默认（`profile=stable`） |
 | 只验证补丁/配置能否应用 | `diagnosis = true`（不编译，几分钟） |
-| 改了编译器或 defconfig 后重建 | `clean_build = true`，必要时再加 `ccache_update = true` |
+| 定位「是不是补丁导致的问题」 | `profile = minimal` |
+| 试新特性 | 改 `custom.env` → `profile = custom` |
+| 改了编译器或 defconfig 后重建 | `clean_build = true`，必要时再 `ccache_mode = reset` |
 | 采 AutoFDO 样本 | 先 `afdo_mode = generate` 构建并刷入，采样后 `afdo_mode = use` |
 
 ## 目录
@@ -73,9 +79,10 @@
 | 目录 | 职责 |
 |---|---|
 | `.github/workflows/` | `kernel.yml` 主编排、`lint.yml` 静态检查、两个清理工作流 |
-| `scripts/` | 构建阶段脚本，`build.env` 是所有参数（含工具链版本、仓库地址）的唯一来源 |
+| `scripts/` | 构建阶段脚本，`build.env` 是参数（含工具链版本、仓库地址）的唯一来源 |
 | `scripts/features/` | 18 个功能模块，顺序固定，见 [功能模块清单](scripts/features/README.md) |
 | `configs/features/` | 17 个 defconfig 配置片段 |
+| `configs/profiles/` | 3 个特性配置档（stable / minimal / custom） |
 | `other_patch/` | 随仓库版本化的补丁（外部的在构建时拉取） |
 | `ak3_overlay/` | AnyKernel3 覆盖层与打包工具 |
 | `lib/ccache-x86-64` | ccache 二进制，VM 首次安装用 |

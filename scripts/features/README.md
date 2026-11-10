@@ -2,7 +2,8 @@
 
 每个功能一个脚本：scripts/features/<name>.sh
 资产目录：other_patch/<name>/
-开关：优先沿用原工作流变量；原块无开关的新增 <NAME>_ENABLE（默认 true，保持原行为）
+开关：取自 configs/profiles/<profile>.env（派发时只选档位），键名与取值由 scripts/check_profiles.py 校验；
+      构建兼容性 / 环境适配类模块不给开关（例如 nvhe、libbpf，始终执行）
 
 ## 当前状态
 
@@ -19,13 +20,13 @@ apply_patches.sh：428 → 217 → 73 行；剩余内容为调用顺序与状态
 | lz4/zstd | features/lz4zstd.sh | LZ4ZSTD_ENABLE（默认 true） | 原块 178-240；lz4accel 拉取、002-zstd 过滤随块搬迁 |
 | Droidspaces | features/droidspaces.sh | DROIDSPACES_ENABLE | false 跳过，standard/extend 生效 |
 | ADIOS | features/adios.sh | ADIOS_ENABLE（默认 true） | — |
-| KVM NVHE | features/nvhe.sh | NVHE_ENABLE（默认 true） | AutoFDO .rel.llvm 元数据兼容 |
+| KVM NVHE | features/nvhe.sh | 无（始终执行） | AutoFDO .rel.llvm 元数据兼容；补丁幂等，只在 gen-hyprel.c 未打过时生效 |
 | Re-Kernel | features/rekernel.sh | REKERNEL_ENABLE | 沿用原变量，默认关闭 |
 | Baseband-guard | features/baseband.sh | BASEBAND_GUARD | 沿用原变量，含 LSM 注入校验 |
 | BBRv3 | features/bbr3.sh | BBR3_ENABLE（默认 true） | — |
 | 调度器 | features/sched.sh | SCHED_ENABLE（默认 true） | NEXT_BUDDY / HRTICK / SIS_PROP / CACHE_HOT_BUDDY / LB_MIN |
 | f2fs | features/f2fs.sh | F2FS_ENABLE（默认 true） | ATGC 路径 bug 已修（0aae0936） |
-| libbpf | features/libbpf.sh | LIBBPF_ENABLE（默认 true） | — |
+| libbpf | features/libbpf.sh | 无（始终执行） | 新 glibc 下 strchr() const 兼容；关掉只会编译失败，自带 const const 自愈 |
 | BORE | features/bore.sh | BORE_ENABLE（默认 false） | 7.0.0 补丁 + 7.0.1r2 审计修复；sched_bore 默认 1（开机即接管） |
 | WildKernels 小补丁 | features/wild_extra.sh | WILD_EXTRA_ENABLE（默认 true） | 扫描顺序 / clear_page 16B 对齐 / cpufreq unlikely |
 | HMBIRD/Polly | features/hmbird.sh | 无（始终执行） | 原 87-152；Overwriter/Defconfig/18 patch/EnablePOLLY/mm_* 原样搬迁，子脚本内 cd common |
