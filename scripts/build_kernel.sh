@@ -328,18 +328,18 @@ else
   echo "  ✓ Polly（-mllvm -polly -polly-vectorizer=stripmine）" | tee -a "$LOG_FILE"
 fi
 info "优化 pass 实际生效验证（工具链 -Rpass 官方日志）:"
-if echo 'static int g(int x){return x*3;} int f(int x){return g(x)+1;}' | clang -x c - -S -o /dev/null -O3 -mllvm -inline-threshold=300 -Rpass=inline 2>&1 | grep -q "inlined into"; then
+if printf '%s\n' 'static int g(int x){return x*3;} int f(int x){return g(x)+1;}' | clang -x c - -S -o /dev/null -O3 -mllvm -inline-threshold=300 -Rpass=inline > /tmp/inline_check.log 2>&1 && grep -q "inlined into" /tmp/inline_check.log; then
   echo "  ✓ inline 实际生效（-Rpass=inline: 函数已内联，threshold 参数生效）" | tee -a "$LOG_FILE"
 else
   echo "  ✗ inline 未生效！" | tee -a "$LOG_FILE"
 fi
-if echo 'int f(int *a, int n){int s=0; for(int i=0;i<n;i++) s+=a[i]; return s;}' | clang -x c - -S -o /dev/null -O3 -Rpass=loop-vectorize 2>&1 | grep -q "vectorized loop"; then
+if printf '%s\n' 'int f(int *a, int n){int s=0; for(int i=0;i<n;i++) s+=a[i]; return s;}' | clang -x c - -S -o /dev/null -O3 -Rpass=loop-vectorize > /tmp/vec_check.log 2>&1 && grep -q "vectorized loop" /tmp/vec_check.log; then
   echo "  ✓ 循环向量化实际生效（-Rpass=loop-vectorize: 已向量化）" | tee -a "$LOG_FILE"
 else
   echo "  ✗ 循环向量化未生效！" | tee -a "$LOG_FILE"
 fi
 if [ "$AFDO_PROFILE_VALID" -eq 1 ]; then
-  if echo 'static int g(int x){return x*3;} int f(int x){return g(x)+1;}' | clang -x c - -S -o /dev/null -O3 -fprofile-sample-use="$AFDO_PROFILE" -Rpass=inline 2>&1 | grep -q "inlined into"; then
+  if printf '%s\n' 'static int g(int x){return x*3;} int f(int x){return g(x)+1;}' | clang -x c - -S -o /dev/null -O3 -fprofile-sample-use="$AFDO_PROFILE" -Rpass=inline > /tmp/afdo_inline_check.log 2>&1 && grep -q "inlined into" /tmp/afdo_inline_check.log; then
     echo "  ✓ AutoFDO profile 驱动 inline 生效（-Rpass=inline + 自采 profile）" | tee -a "$LOG_FILE"
   else
     echo "  ✗ AutoFDO profile 驱动未生效！" | tee -a "$LOG_FILE"
