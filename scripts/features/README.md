@@ -37,7 +37,8 @@ configs/features/ 下 17 个片段：adios、bore、droidspaces、droidspaces_ex
 kernel_tunables、ksu_susfs、lz4kd、misc_toggles、namespaces、netfilter、
 perf_toggles、rcu、tmpfs、ubsan_oem、zram、zsmalloc_chain
 
-config_inject.sh：587 → 143 行，配置指令序列与改造前逐行一致（151 条）。
+config_inject.sh：587 → 143 行，配置指令序列与改造前逐行一致。
+片段数量与同键冲突由 `scripts/check_configs.py` 在每次 lint 时自动校验并打印实时条数，不再手工维护数字。
 
 ### 未抽取（有意保留）
 
