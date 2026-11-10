@@ -78,7 +78,7 @@ def main():
 
     def find_sym(addr):
         i = bisect.bisect_right(addrs, addr) - 1
-        if i < 0:
+        if i < 0 or i >= len(syms):
             return None
         a, s, n = syms[i]
         return n if addr < a + max(s, 1) else (n if addr < a + 0x100000 else None)
