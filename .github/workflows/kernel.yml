@@ -129,7 +129,7 @@ on:
         type: string
         default: ''
       diagnosis:
-        description: '诊断模式：仅生成并导出config'
+        description: '诊断模式：同步源码+打补丁+注入配置后导出 config，不编译不打包'
         required: true
         type: boolean
         default: false
@@ -154,8 +154,10 @@ jobs:
     runs-on: ${{ inputs.runner_type }}
     timeout-minutes: 180
     permissions:
+      # 构建不向仓库回写任何内容（同步源码走公开 HTTPS 读），
+      # actions: write 只用于 gh cache delete 与 artifact 上传
       actions: write
-      contents: write
+      contents: read
     env:
       LOG_FILE: ${{ github.workspace }}/build_summary.log
       KSU_TYPE: ${{ inputs.ksu_type }}
@@ -319,6 +321,19 @@ jobs:
         if: ${{ !inputs.diagnosis }}
         id: create_zip
         run: bash "$GITHUB_WORKSPACE/scripts/package.sh"
+
+      # 产物原本只存在 VM 磁盘上（保留 5 个历史包），VM 磁盘损坏即全部丢失；
+      # 这里再上传一份到 GitHub，7 天后自动过期
+      - name: 上传安装包
+        if: ${{ !inputs.diagnosis }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.create_zip.outputs.ak3name }}
+          path: |
+            ${{ github.workspace }}/kernel_workspace/${{ steps.create_zip.outputs.ak3name }}
+            ${{ github.workspace }}/build_summary.log
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: 上传 Ccache 调试日志
         if: ${{ always() && inputs.ccache_debug && !inputs.diagnosis }}

@@ -79,6 +79,21 @@ find_latest() {
   find "$1" -type f -name "$2" 2>/dev/null | sort | tail -n 1 || true
 }
 
+# 磁盘预检：全量构建要 out(≈25G)+ccache(20G)，空间不足时在克隆源码之前就失败，
+# 而不是让 make 跑到一半报 ENOSPC（那时前面十几分钟全白费）
+need_disk() {
+  local need_gb="$1" label="${2:-构建}" avail
+  avail=$(df -Pk "$HOME" 2>/dev/null | awk 'NR==2 {printf "%d", $4/1048576}') || avail=""
+  if [ -z "${avail:-}" ]; then
+    warn "无法读取 $HOME 所在分区剩余空间，跳过磁盘预检"
+    return 0
+  fi
+  if [ "$avail" -lt "$need_gb" ]; then
+    die "$label 至少需要 ${need_gb}G 空闲磁盘，当前仅 ${avail}G（$HOME）。先清理 kernel_workspace/common/out 或执行 ccache -C"
+  fi
+  info "磁盘预检通过：剩余 ${avail}G（要求 ≥${need_gb}G）"
+}
+
 apply_patch_file() {
   local src="$1" out="$2" mode="$3" label="$4"
   local log

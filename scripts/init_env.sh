@@ -12,6 +12,14 @@ info "修复Git大小写敏感"
 git config core.ignorecase false || true
 info "仓库：$GITHUB_REPOSITORY"
 info "分支：$GITHUB_REF_NAME"
+
+# 磁盘预检（在克隆 3G 内核源码之前做，避免跑到一半 ENOSPC）
+if [[ "${CLEAN_BUILD:-false}" == "true" ]]; then
+  need_disk 30 "全量构建（clean_build=true）"
+else
+  need_disk 6 "增量构建"
+fi
+
 cd "$GITHUB_WORKSPACE"
 mkdir -p kernel_workspace
 cd kernel_workspace
