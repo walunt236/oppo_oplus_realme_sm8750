@@ -69,25 +69,6 @@ if "TEXT_SPLIT" not in s:
         raise SystemExit("MFS: TEXT_MAIN line not found")
     lds.write_text("\n".join(out) + "\n")
     print("MFS: patched include/asm-generic/vmlinux.lds.h")
-# Add __unlikely_text_start/end boundaries (Clang19 MFS uses .text.unlikely)
-s = lds.read_text()
-if "__unlikely_text_start" not in s:
-    lines = s.splitlines()
-    out = []
-    inserted = False
-    for line in lines:
-        if "*(.text.unlikely .text.unlikely.*)" in line:
-            out.append("\t\t__unlikely_text_start = .;\t\t\t\t\\")
-            out.append(line)
-            out.append("\t\t__unlikely_text_end = .;\t\t\t\t\\")
-            inserted = True
-        else:
-            out.append(line)
-    if not inserted:
-        raise SystemExit("MFS: .text.unlikely line not found")
-    lds.write_text("\n".join(out) + "\n")
-    print("MFS: added unlikely text boundaries")
-
 PYEOF
 
 grep -q -- '-fsplit-machine-functions' "$AUTOFDO" || die "MFS: AutoFDO flags missing"
