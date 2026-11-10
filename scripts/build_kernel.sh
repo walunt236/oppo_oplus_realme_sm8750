@@ -173,21 +173,22 @@ cat << 'EOF' > ld-wrapper
 #!/bin/sh
 ORDER=""
 OUT=""
+APPLY_ORDER=0
 prev=""
 for a in "$@"; do
   if [ "$prev" = "o" ]; then OUT="$a"; prev=""; continue; fi
   case "$a" in
     -o) prev=o;;
-    -r|--relocatable) ORDER="";;
+    -r|--relocatable) APPLY_ORDER=0;;
   esac
 done
-# 只给最终 vmlinux 链接套排序表；ThinLTO 分区链接/模块链接各自只含
-# 部分符号，套完整排序表会对每个分区重复报 "no such symbol"
+# 只给最终 vmlinux 链接套排序表；.tmp_vmlinux.btf / kallsyms1/2 等中间链接
+# 只含部分符号，套完整排序表会重复报 no such symbol
 case "$OUT" in
-  vmlinux) ;;
-  *) ORDER="";;
+  vmlinux) APPLY_ORDER=1;;
+  *) APPLY_ORDER=0;;
 esac
-if [ -z "$ORDER" ] && [ -n "${HOTFILE:-}" ] && [ -s "${HOTFILE:-}" ]; then
+if [ "$APPLY_ORDER" = 1 ] && [ -n "${HOTFILE:-}" ] && [ -s "${HOTFILE:-}" ]; then
   ORDER="--symbol-ordering-file=$HOTFILE"
 fi
 exec ld.lld --thinlto-cache-dir="$HOME/.thinlto-cache" --thinlto-cache-policy=cache_size_bytes=4g --thinlto-jobs="$(nproc --all)" $ORDER "$@"
