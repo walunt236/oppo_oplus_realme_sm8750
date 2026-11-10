@@ -1,0 +1,34 @@
+name: 静态检查
+
+# 构建要等 VM 起来 + 克隆 3G 内核源码，一次失败成本很高；
+# 这里用 GitHub 托管的 runner 在 push/PR 时秒级拦掉语法、行尾、配置冲突问题。
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lint-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: 检出
+        uses: actions/checkout@v4
+
+      - name: 安装依赖
+        run: python3 -m pip install --quiet --disable-pip-version-check pyyaml
+
+      - name: 脚本与配置检查
+        run: bash scripts/lint.sh
+
+      # shellcheck 目前仅提示：存量脚本还有告警，先积累基线，稳定后再改为阻断
+      - name: shellcheck（提示）
+        continue-on-error: true
+        run: shellcheck -S warning -x scripts/*.sh scripts/features/*.sh

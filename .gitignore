@@ -1,2 +1,9 @@
 /out/
 .mimosa/
+
+# 运行时由 init_env.sh 克隆/生成，体积数 GB（工作流里靠 git clean -e 豁免，这里再兜一层）
+/kernel_workspace/
+
+# Python 缓存
+__pycache__/
+*.pyc
