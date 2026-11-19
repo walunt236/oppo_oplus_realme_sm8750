@@ -181,3 +181,9 @@ run 34 success：
     AnyKernel3-KSU-32734-6.6.143-memcomp-thp-20261119.zip
 
 包含 shmem + large folio deferred split。
+
+## large folio 上限说明
+
+MEMCOMP_MAX_COMPRESS_PAGES=16，即单次最多 16 页（64KB）。
+QEMU 测试使用 2MB PMD 大页（512 页），超出上限，stat=0 属于预期，不是崩溃。
+0010 只处理 1..16 页恢复后的 deferred split。
