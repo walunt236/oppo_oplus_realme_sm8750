@@ -65,3 +65,13 @@
     Kernel panic
 
 当前已回退 mm/shmem.c，保留已验证的匿名页路径。shmem 需要补齐 load/invalidate 路径后再启用。
+
+## GitHub CI
+
+memcomp 构建已通过：
+
+    run 31 success
+    AnyKernel3-none-none-6.6.143-memcomp-ci-20261119.zip
+
+该次使用 ksu_type=none、afdo_mode=off 验证打包链路。
+KSU + AutoFDO 完整配置仍需补测。
