@@ -85,7 +85,7 @@ if [[ "$STORED_CFG" != "$CFG_HASH" ]]; then
   echo "CFG_HASH=$CFG_HASH" >> "$GITHUB_ENV"
 fi
 
-if [ "\${MEMCOMP_ENABLE:-false}" = "true" ]; then
+if [ "${MEMCOMP_ENABLE:-false}" = "true" ]; then
   info "memcomp 启用，跳过 zram 配置断言"
 else
 if [ -f out/.config ]; then
