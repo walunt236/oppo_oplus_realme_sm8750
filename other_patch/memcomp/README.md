@@ -239,3 +239,7 @@ ART GC 崩溃不再出现。
 ## 0012 精确 token residency
 
 已补入 mincore 对 memcomp token 的精确查询（含 shmem），适配 6.6 swp_offset API；无 writeback 时 MC16_SWAPPED 直接视为不可读。
+
+## 0014 selftest
+
+memcomp selftest 已在 QEMU 通过：256 个 memcomp PTE，pageout/refault 数据完整性通过，refault 后全部 present。swap 相关用例因无 active swap 跳过。
