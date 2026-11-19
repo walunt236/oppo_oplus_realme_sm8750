@@ -202,3 +202,15 @@ QEMU 测试使用 2MB PMD 大页（512 页），超出上限，stat=0 属于预�
     ioctl_userfaultfd: move failed: Bad address
 
 补入 0001 每页 exclusivity 检查与 0004 memcomp entry move 支持。
+
+## 真机 UFFDIO_MOVE 修复验证
+
+新内核 uname 6.6.143-oneplus13-4k-aosp16-ge1b346b6b4f4。
+静置 5 分钟：
+
+    uptime 343s，无软重启
+    logcat crash UFFDIO_MOVE 计数 0
+    memcomp stat 779644928 314685152 322609152
+    无 memcomp/UFFD panic
+
+ART GC 崩溃不再出现。
