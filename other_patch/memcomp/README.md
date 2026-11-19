@@ -140,3 +140,13 @@ QEMU tmpfs 写入 400MB pattern，memhog 1100MB 压力后读回校验：
     pressure stat: 339181568 23607871 28016640
 
 无 WARNING/Bad swap/OOM。
+
+## CI 产物 shmem 数据完整性
+
+CI 构建的 KSU+AFDO+memcomp+shmem Image 在 QEMU 验证：
+
+    shmemtest wrote 400 MB
+    VERIFY_OK 400 MB
+    MemAvailable: 1672 kB
+
+无 WARNING/Bad swap/OOM；末尾 panic 仅为 init 退出。
