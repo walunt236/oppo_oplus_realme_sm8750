@@ -67,6 +67,16 @@ on:
         required: true
         type: boolean
         default: true
+      sched_ext_enable:
+        description: '启用 sched_ext（实验；Scene 调度需要）'
+        required: true
+        type: boolean
+        default: false
+      memcomp_enable:
+        description: '启用 memcomp（实验；会关闭 zram/zswap）'
+        required: true
+        type: boolean
+        default: false
       lz4zstd_enable:
         description: '集成lz4/zstd'
         required: true
@@ -153,6 +163,8 @@ jobs:
       ADIOS_ENABLE: ${{ inputs.adios_enable }}
       BBR3_ENABLE: ${{ inputs.bbr3_enable }}
       SCHED_ENABLE: ${{ inputs.sched_enable }}
+      SCHED_EXT_ENABLE: ${{ inputs.sched_ext_enable }}
+      MEMCOMP_ENABLE: ${{ inputs.memcomp_enable }}
       LZ4ZSTD_ENABLE: ${{ inputs.lz4zstd_enable }}
       F2FS_ENABLE: ${{ inputs.f2fs_enable }}
       BORE_ENABLE: ${{ inputs.bore_enable }}

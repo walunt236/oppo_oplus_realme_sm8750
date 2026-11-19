@@ -71,3 +71,6 @@ bash "$GITHUB_WORKSPACE/scripts/features/bore.sh"
 
 # WildKernels 额外小补丁（默认启用）
 bash "$GITHUB_WORKSPACE/scripts/features/wild_extra.sh"
+
+# memcomp（实验开关 MEMCOMP_ENABLE=true）
+bash "$GITHUB_WORKSPACE/scripts/features/memcomp.sh"

@@ -26,17 +26,34 @@ if [[ "$LZ4KD_ENABLE" == "true" ]]; then
   cat "$GITHUB_WORKSPACE/configs/features/lz4kd.config" >> "$DCFG"
 fi
 
-cat "$GITHUB_WORKSPACE/configs/features/zram.config" >> "$DCFG"
+if [[ "${MEMCOMP_ENABLE:-false}" == "true" ]]; then
+  cat "$GITHUB_WORKSPACE/configs/features/memcomp.config" >> "$DCFG"
+  # memcomp 与 zram/zswap 互斥，强制关闭
+  sed -i -E '/^CONFIG_ZRAM/d;/^CONFIG_ZSWAP/d;/^# CONFIG_ZRAM/d;/^# CONFIG_ZSWAP/d' "$DCFG"
+  echo "# CONFIG_ZRAM is not set" >> "$DCFG"
+  echo "# CONFIG_ZSWAP is not set" >> "$DCFG"
+  info "memcomp 已启用（ZRAM/ZSWAP 强制关闭）"
+else
+  cat "$GITHUB_WORKSPACE/configs/features/zram.config" >> "$DCFG"
+fi
 cat "$GITHUB_WORKSPACE/configs/features/zsmalloc_chain.config" >> "$DCFG"
 
 
 echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" >> "$DCFG"
-# 骁龙 6.6.14x 已从 kernel/sched/Makefile 移除 ext.o，开启该选项会导致
-# bpf_sched_ext_ops 未定义，这里强制关闭
-# 关闭 sched_ext：6.6 内核无此功能（6.12 才进主线），且高通 BSP 已剥离
-# 核心集成（task_struct 缺 sched_ext_entity），开启只会引用不存在的符号
-sed -i '/^CONFIG_SCHED_CLASS_EXT/d' "$DCFG"
-echo "# CONFIG_SCHED_CLASS_EXT is not set" >> "$DCFG"
+# sched_ext：默认关闭。源码里已有 kernel/sched/ext.c 和 core 集成，
+# 但 OnePlus 的 kernel/sched/Makefile 没有编 ext.o；开启时补回并加配置。
+if [[ "${SCHED_EXT_ENABLE:-false}" == "true" ]]; then
+  sed -i '/^CONFIG_SCHED_CLASS_EXT/d' "$DCFG"
+  cat "$GITHUB_WORKSPACE/configs/features/sched_ext.config" >> "$DCFG"
+  SCX_MK="./common/kernel/sched/Makefile"
+  if ! grep -qE 'CONFIG_SCHED_CLASS_EXT.*ext\.o' "$SCX_MK"; then
+    echo 'obj-$(CONFIG_SCHED_CLASS_EXT) += ext.o' >> "$SCX_MK"
+  fi
+  info "sched_ext 已启用（CONFIG_SCHED_CLASS_EXT=y + ext.o）"
+else
+  sed -i '/^CONFIG_SCHED_CLASS_EXT/d' "$DCFG"
+  echo "# CONFIG_SCHED_CLASS_EXT is not set" >> "$DCFG"
+fi
 # ARM64 cluster 调度：让 EAS 感知多 cluster 拓扑（默认选项，纯拓扑感知）
 echo "CONFIG_SCHED_CLUSTER=y" >> "$DCFG"
 # （已移除无效的 check_defconfig 删除动作：本流水线不调用 build/build.sh，该校验从未执行）
