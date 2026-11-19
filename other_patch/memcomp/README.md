@@ -85,3 +85,21 @@ CI artifact Image 已在 QEMU 验证（CPU max，Oryon 指令集）：
     after:  427139072 3750559 5406720
 
 无 memcomp 崩溃；末尾 panic 仅为 init 主动退出。
+
+## 完整配置 CI + QEMU 验证
+
+GitHub Actions run 32 success：
+
+    ksu_type=ksu
+    susfs_enable=false
+    afdo_mode=use
+    memcomp_enable=true
+    AnyKernel3-KSU-32734-6.6.143-memcomp-ksu-20261119.zip
+
+CI Image 已在 QEMU（-cpu max）启动：
+
+    before: 0 0 0
+    under:  270876672 2383140 3682304
+    after:  36864 2413 69632
+
+无 memcomp 崩溃；末尾 panic 仅为 init 主动退出。
