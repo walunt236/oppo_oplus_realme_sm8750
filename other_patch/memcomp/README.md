@@ -194,3 +194,11 @@ QEMU 测试使用 2MB PMD 大页（512 页），超出上限，stat=0 属于预�
 - 所有实验改动在 memcomp-6.6
 - 回滚只需切回 main / 恢复 boot 备份
 - 实验内核关闭 ZRAM/ZSWAP，不能直接作为日常启动项
+
+## UFFDIO_MOVE 修复
+
+真机发现 ART MarkCompact 报：
+
+    ioctl_userfaultfd: move failed: Bad address
+
+补入 0001 每页 exclusivity 检查与 0004 memcomp entry move 支持。
