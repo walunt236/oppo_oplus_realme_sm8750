@@ -243,3 +243,7 @@ ART GC 崩溃不再出现。
 ## 0014 selftest
 
 memcomp selftest 已在 QEMU 通过：256 个 memcomp PTE，pageout/refault 数据完整性通过，refault 后全部 present。swap 相关用例因无 active swap 跳过。
+
+## 0015/0016 文档
+
+已补入 design.rst 和 admin-guide.rst 到 other_patch/memcomp/docs/。
