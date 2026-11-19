@@ -265,3 +265,7 @@ memcomp selftest 已在 QEMU 通过：256 个 memcomp PTE，pageout/refault 数�
 最新分支 CI 构建成功（memcomp=true, SUSFS=false）。CI 镜像 QEMU 运行 selftest 与 UFFDIO_MOVE 测试均通过，详见 other_patch/memcomp/bench/ci-run-37.md。
 
 CI 镜像额外通过 shmem 400MB 压力数据校验（VERIFY_OK 400 MB）。
+
+## zstd vs lz4hc
+
+QEMU 256MB PAGEOUT：zstd 约 17.2s，lz4hc 约 50.5s；压缩结果和池占用 zstd 略优，refault 差异在噪声内。详见 other_patch/memcomp/bench/compressor-comparison.md。
