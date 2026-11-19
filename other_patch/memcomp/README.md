@@ -159,3 +159,7 @@ memcomp: 1529.1 / 1530.6 / 1513.5 ms
 baseline: 1468.1 / 2843.0 / 1460.3 ms
 
 QEMU 噪声大，不能据此宣称速度提升。
+
+## 大页测试
+
+已加入恢复后 large folio 的 deferred split 处理（0010）。QEMU THP 压力下未崩溃，但 memcomp stat 仍为 0，说明大页回收路径尚未真正触发压缩。
