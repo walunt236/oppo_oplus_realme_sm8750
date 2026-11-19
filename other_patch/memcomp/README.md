@@ -263,3 +263,5 @@ memcomp selftest 已在 QEMU 通过：256 个 memcomp PTE，pageout/refault 数�
 ## CI run 37
 
 最新分支 CI 构建成功（memcomp=true, SUSFS=false）。CI 镜像 QEMU 运行 selftest 与 UFFDIO_MOVE 测试均通过，详见 other_patch/memcomp/bench/ci-run-37.md。
+
+CI 镜像额外通过 shmem 400MB 压力数据校验（VERIFY_OK 400 MB）。

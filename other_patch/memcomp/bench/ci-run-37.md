@@ -11,3 +11,12 @@ AnyKernel3-KSU-32734-6.6.143-oneplus13-4k-aosp16-20261119.zip
 QEMU on the CI image:
 - memcomp_selftest: pass:3 fail:0 skip:5
 - UFFDIO_MOVE test: 256 compressed PTEs, MOVE_RET=0, moved=1048576, VERIFY_OK
+
+## shmem pressure check on CI image
+
+tmpfs 1500M, memhog 1100MB background, memcomp enabled:
+
+    VERIFY_OK 400 MB
+    MemAvailable: 1296 kB
+
+No WARNING/Bad swap/OOM in the run.
