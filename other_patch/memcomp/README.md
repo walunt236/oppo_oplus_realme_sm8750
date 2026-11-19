@@ -103,3 +103,21 @@ CI Image 已在 QEMU（-cpu max）启动：
     after:  36864 2413 69632
 
 无 memcomp 崩溃；末尾 panic 仅为 init 主动退出。
+
+## 模式数据压力测试
+
+1400MB 可压缩 pattern，min_free=500MB：
+
+无 memcomp：
+
+    touched 1400 MB in 1900.4 ms
+    MemFree 544228 kB
+    Inactive(anon) 0 kB
+
+有 memcomp：
+
+    touched 1400 MB in 1525.8 ms
+    stat 242323456 16505098 17403904
+    MemAvailable 16300 kB
+
+单次结果，仅用于功能验证，不作为最终性能结论。
