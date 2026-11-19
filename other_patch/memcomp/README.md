@@ -255,3 +255,7 @@ memcomp selftest 已在 QEMU 通过：256 个 memcomp PTE，pageout/refault 数�
 ## QEMU 8 轮 soak
 
 8 轮 memhog 压力后 selftest 仍通过，无 WARNING/BUG/OOM，统计见 other_patch/memcomp/bench/qemu-soak-result.md。
+
+## UFFDIO_MOVE 合成测试
+
+1MB 源范围 MADV_PAGEOUT 后得到 256 个 memcomp PTE；UFFDIO_MOVE 返回 0，moved=1048576，目标数据 VERIFY_OK。
