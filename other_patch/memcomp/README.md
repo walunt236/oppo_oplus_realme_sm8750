@@ -173,3 +173,11 @@ QEMU 噪声大，不能据此宣称速度提升。
     无 WARNING/Bad swap/OOM
 
 large folio 的 memcomp 压缩路径仍未打通。
+
+## 最新 CI
+
+run 34 success：
+
+    AnyKernel3-KSU-32734-6.6.143-memcomp-thp-20261119.zip
+
+包含 shmem + large folio deferred split。
