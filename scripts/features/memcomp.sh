@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 set -u
 
-if [[ "\${MEMCOMP_ENABLE:-false}" != "true" ]]; then
+if [[ "${MEMCOMP_ENABLE:-false}" != "true" ]]; then
     echo "[FEATURE] memcomp 未启用，跳过"
     exit 0
 fi
 
-WS="\${GITHUB_WORKSPACE:-$(pwd)}"
+WS="${GITHUB_WORKSPACE:-$(pwd)}"
 COMMON="$WS/kernel_workspace/common"
 OVERLAY="$WS/other_patch/memcomp/memcomp-overlay.tar.gz"
 
