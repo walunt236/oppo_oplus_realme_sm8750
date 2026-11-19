@@ -163,3 +163,13 @@ QEMU 噪声大，不能据此宣称速度提升。
 ## 大页测试
 
 已加入恢复后 large folio 的 deferred split 处理（0010）。QEMU THP 压力下未崩溃，但 memcomp stat 仍为 0，说明大页回收路径尚未真正触发压缩。
+
+## THP 复测
+
+1000MB MADV_HUGEPAGE + 700MB 第二进程，min_free=200MB：
+
+    memcomp stat 仍为 0 0 0
+    AnonHugePages 约 1.65GB
+    无 WARNING/Bad swap/OOM
+
+large folio 的 memcomp 压缩路径仍未打通。
