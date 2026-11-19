@@ -223,3 +223,7 @@ ART GC 崩溃不再出现。
     UFFDIO_MOVE crash 0
     memcomp stat 1130950656 461510640 471355392
     无软重启
+
+## 0009 large folio 批量 unmap
+
+已补入 mm/memcomp_rmap.h 和 rmap 批量 unmap 路径；适配 6.6 set_tlb_ubc_flush_pending 签名。
