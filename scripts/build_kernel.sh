@@ -372,7 +372,9 @@ fi
 
 info "内核镜像编译完成"
 # zram 调优版本标记校验：缺失说明增量构建复用了旧目标文件
-if [ -n "${ZRAM_TUNE_REV:-}" ] && [ -f out/vmlinux ]; then
+if [ "${MEMCOMP_ENABLE:-false}" = "true" ]; then
+  info "memcomp 启用，跳过 zram 调优标记校验"
+elif [ -n "${ZRAM_TUNE_REV:-}" ] && [ -f out/vmlinux ]; then
   if grep -aq "$ZRAM_TUNE_REV" out/vmlinux; then
     info "zram 调优标记校验通过（$ZRAM_TUNE_REV）"
   else
