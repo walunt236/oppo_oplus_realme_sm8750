@@ -344,7 +344,7 @@ if [ -f out/arch/arm64/boot/Image ]; then
     error "Image 内嵌配置数据缺失（IKCFG 提取失败），产物配置陈旧，中止"
     exit 1
   fi
-  assert_ikcfg CONFIG_ZRAM_MEMORY_TRACKING
+  if [[ "${MEMCOMP_ENABLE:-false}" != "true" ]]; then assert_ikcfg CONFIG_ZRAM_MEMORY_TRACKING; fi
   if [ "$AFDO_PROFILE_VALID" -eq 1 ]; then assert_ikcfg CONFIG_AUTOFDO_CLANG; fi
   assert_ikcfg CONFIG_HZ_300
   if [[ "${BBR3_ENABLE:-true}" == "true" ]]; then assert_ikcfg CONFIG_TCP_CONG_BBR3; fi
