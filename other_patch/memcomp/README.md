@@ -131,3 +131,12 @@ CI Image 已在 QEMU（-cpu max）启动：
     after: 138362880 422731 3616768
 
 无 WARNING/Bad swap/OOM。
+
+## shmem 数据一致性验证
+
+QEMU tmpfs 写入 400MB pattern，memhog 1100MB 压力后读回校验：
+
+    VERIFY_OK 400 MB
+    pressure stat: 339181568 23607871 28016640
+
+无 WARNING/Bad swap/OOM。
