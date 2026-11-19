@@ -121,3 +121,13 @@ CI Image 已在 QEMU（-cpu max）启动：
     MemAvailable 16300 kB
 
 单次结果，仅用于功能验证，不作为最终性能结论。
+
+## shmem/tmpfs 接入
+
+补齐了 shmem swapin 的 memcomp load/invalidate 路径。QEMU tmpfs 压力测试：
+
+    before: 0 0 0
+    pressure: 422699008 149349 2437120
+    after: 138362880 422731 3616768
+
+无 WARNING/Bad swap/OOM。
