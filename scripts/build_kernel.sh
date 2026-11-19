@@ -334,7 +334,7 @@ if [ "$AFDO_PROFILE_VALID" -eq 1 ]; then
   AFDO_CFLAGS="-fprofile-sample-accurate -mllvm -sample-profile-max-propagate-iterations=300"
   AFDO_MAKE_ARGS="CLANG_AUTOFDO_PROFILE=$AFDO_PROFILE"
 fi
-make -j${BUILD_JOBS} LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" LD="$(pwd)/ld-wrapper" HOSTLD=ld.lld O=out KCFLAGS="-O3 -Wno-error $KCFLAGS_EXTRA $AFDO_CFLAGS" $AFDO_MAKE_ARGS Image
+make -j${BUILD_JOBS} LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" LD="$(pwd)/ld-wrapper" HOSTLD=ld.lld O=out KCFLAGS="-O3 -Wno-error $KCFLAGS_EXTRA $AFDO_CFLAGS" $AFDO_MAKE_ARGS Image 2>&1 | tee "$GITHUB_WORKSPACE/ci-kernel-build.log"
 assert_ikcfg() {
   grep -q "^${1}=y" <<< "$IKCFG_TEXT" || die "Image 内嵌配置缺少 ${1}，产物配置陈旧，中止"
 }
