@@ -227,3 +227,11 @@ ART GC 崩溃不再出现。
 ## 0009 large folio 批量 unmap
 
 已补入 mm/memcomp_rmap.h 和 rmap 批量 unmap 路径；适配 6.6 set_tlb_ubc_flush_pending 签名。
+
+## 0008 异步压缩
+
+已补入 memcomp_async 路径（MEMCOMP_ASYNC_PAGES=32），QEMU 4K/THP 压力测试无 WARNING/BUG，stat 增长正常。
+
+## SUSFS
+
+后续构建默认关闭 SUSFS（workflow susfs_enable 默认 false）。
