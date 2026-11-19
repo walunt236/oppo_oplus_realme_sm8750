@@ -158,3 +158,10 @@ cat "$GITHUB_WORKSPACE/configs/features/perf_toggles.config" >> "$DCFG"
 if [[ "${BORE_ENABLE:-false}" == "true" ]]; then
   cat "$GITHUB_WORKSPACE/configs/features/bore.config" >> "$DCFG"
 fi
+
+# memcomp 最终互斥：misc_toggles 等后续配置可能重新打开 zram
+if [ "${MEMCOMP_ENABLE:-false}" = "true" ]; then
+  sed -i -E '/^CONFIG_ZRAM/d;/^CONFIG_ZSWAP/d;/^# CONFIG_ZRAM/d;/^# CONFIG_ZSWAP/d' "$DCFG"
+  echo "# CONFIG_ZRAM is not set" >> "$DCFG"
+  echo "# CONFIG_ZSWAP is not set" >> "$DCFG"
+fi
