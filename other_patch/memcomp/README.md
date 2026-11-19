@@ -214,3 +214,12 @@ QEMU 测试使用 2MB PMD 大页（512 页），超出上限，stat=0 属于预�
     无 memcomp/UFFD panic
 
 ART GC 崩溃不再出现。
+
+## 真机更长时间观察
+
+新 UFFD 内核静置约 14 分钟：
+
+    uptime 854s
+    UFFDIO_MOVE crash 0
+    memcomp stat 1130950656 461510640 471355392
+    无软重启
