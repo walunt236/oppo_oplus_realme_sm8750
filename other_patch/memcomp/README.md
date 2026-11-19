@@ -150,3 +150,12 @@ CI 构建的 KSU+AFDO+memcomp+shmem Image 在 QEMU 验证：
     MemAvailable: 1672 kB
 
 无 WARNING/Bad swap/OOM；末尾 panic 仅为 init 退出。
+
+## 重复基准
+
+pattern 1400MB，3 次：
+
+memcomp: 1529.1 / 1530.6 / 1513.5 ms
+baseline: 1468.1 / 2843.0 / 1460.3 ms
+
+QEMU 噪声大，不能据此宣称速度提升。
