@@ -259,3 +259,7 @@ memcomp selftest 已在 QEMU 通过：256 个 memcomp PTE，pageout/refault 数�
 ## UFFDIO_MOVE 合成测试
 
 1MB 源范围 MADV_PAGEOUT 后得到 256 个 memcomp PTE；UFFDIO_MOVE 返回 0，moved=1048576，目标数据 VERIFY_OK。
+
+## CI run 37
+
+最新分支 CI 构建成功（memcomp=true, SUSFS=false）。CI 镜像 QEMU 运行 selftest 与 UFFDIO_MOVE 测试均通过，详见 other_patch/memcomp/bench/ci-run-37.md。
