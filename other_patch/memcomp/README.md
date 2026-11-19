@@ -187,3 +187,10 @@ run 34 success：
 MEMCOMP_MAX_COMPRESS_PAGES=16，即单次最多 16 页（64KB）。
 QEMU 测试使用 2MB PMD 大页（512 页），超出上限，stat=0 属于预期，不是崩溃。
 0010 只处理 1..16 页恢复后的 deferred split。
+
+## 回滚说明
+
+- 日常主线 main 未被修改
+- 所有实验改动在 memcomp-6.6
+- 回滚只需切回 main / 恢复 boot 备份
+- 实验内核关闭 ZRAM/ZSWAP，不能直接作为日常启动项
