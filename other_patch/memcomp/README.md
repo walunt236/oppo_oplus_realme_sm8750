@@ -247,3 +247,7 @@ memcomp selftest 已在 QEMU 通过：256 个 memcomp PTE，pageout/refault 数�
 ## 0015/0016 文档
 
 已补入 design.rst 和 admin-guide.rst 到 other_patch/memcomp/docs/。
+
+## QEMU A/B
+
+2 GiB QEMU：baseline 在 memhog 1900MB 时 OOM；memcomp 无 OOM，统计见 other_patch/memcomp/bench/qemu-ab-result.md。
