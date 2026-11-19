@@ -56,3 +56,12 @@
 ## 注意
 
 这是实验分支，不要直接当作日常主线。
+
+## shmem 尝试记录
+
+0006 的 shmem 最小接入已尝试，但在 QEMU tmpfs 压力下出现：
+
+    get_swap_device: Bad swap file entry
+    Kernel panic
+
+当前已回退 mm/shmem.c，保留已验证的匿名页路径。shmem 需要补齐 load/invalidate 路径后再启用。
