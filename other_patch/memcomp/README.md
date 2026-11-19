@@ -251,3 +251,7 @@ memcomp selftest 已在 QEMU 通过：256 个 memcomp PTE，pageout/refault 数�
 ## QEMU A/B
 
 2 GiB QEMU：baseline 在 memhog 1900MB 时 OOM；memcomp 无 OOM，统计见 other_patch/memcomp/bench/qemu-ab-result.md。
+
+## QEMU 8 轮 soak
+
+8 轮 memhog 压力后 selftest 仍通过，无 WARNING/BUG/OOM，统计见 other_patch/memcomp/bench/qemu-soak-result.md。
