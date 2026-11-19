@@ -75,3 +75,13 @@ memcomp 构建已通过：
 
 该次使用 ksu_type=none、afdo_mode=off 验证打包链路。
 KSU + AutoFDO 完整配置仍需补测。
+
+## CI 产物启动验证
+
+CI artifact Image 已在 QEMU 验证（CPU max，Oryon 指令集）：
+
+    before: 0 0 0
+    under:  359686144 3160300 4657152
+    after:  427139072 3750559 5406720
+
+无 memcomp 崩溃；末尾 panic 仅为 init 主动退出。
