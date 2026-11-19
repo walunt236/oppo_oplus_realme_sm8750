@@ -27,7 +27,23 @@
 
 无 Bad swap、无 WARNING、无 OOM、无 panic。
 
-对照：未启用 memcomp 的同配置内核在同样压力下 OOM 杀掉 memhog。
+## 对照结果
+
+同配置、同压力、同 init：
+
+无 memcomp：
+
+    Out of memory: Killed process (memhog)
+
+有 memcomp：
+
+    memhog touched 1400 MB in 4351.3 ms
+    memcomp stat = 373854208 3275060 4444160
+    MemFree ~908 MB
+    无 OOM/WARNING/panic
+
+说明 memcomp 在压力下能压缩匿名页并避免 OOM。
+测试使用了人为高 watermark，且大部分是零页，压缩比不代表真实负载。
 
 ## 尚未完成
 
