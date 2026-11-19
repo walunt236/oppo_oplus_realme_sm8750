@@ -235,3 +235,7 @@ ART GC 崩溃不再出现。
 ## SUSFS
 
 后续构建默认关闭 SUSFS（workflow susfs_enable 默认 false）。
+
+## 0012 精确 token residency
+
+已补入 mincore 对 memcomp token 的精确查询（含 shmem），适配 6.6 swp_offset API；无 writeback 时 MC16_SWAPPED 直接视为不可读。
