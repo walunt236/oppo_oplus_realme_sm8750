@@ -85,6 +85,9 @@ if [[ "$STORED_CFG" != "$CFG_HASH" ]]; then
   echo "CFG_HASH=$CFG_HASH" >> "$GITHUB_ENV"
 fi
 
+if [ "\${MEMCOMP_ENABLE:-false}" = "true" ]; then
+  info "memcomp 启用，跳过 zram 配置断言"
+else
 if [ -f out/.config ]; then
   if grep -q '^CONFIG_ZRAM_DEF_COMP="lz4"' out/.config && grep -q '^CONFIG_ZRAM_DEF_COMP_LZ4=y' out/.config; then
     info "zram 主算法 lz4（次级 lz4hc 冷数据重压缩）"
@@ -99,6 +102,7 @@ if [ -f out/.config ]; then
   else
     die "ZRAM_MEMORY_TRACKING 配置未生效，中止构建"
   fi
+fi
 fi
 
 if [ "$AFDO_PROFILE_VALID" -eq 1 ]; then assert_config CONFIG_AUTOFDO_CLANG "AutoFDO (AUTOFDO_CLANG)"; fi
