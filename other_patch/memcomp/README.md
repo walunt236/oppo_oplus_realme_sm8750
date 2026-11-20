@@ -285,3 +285,7 @@ QEMU 256MB PAGEOUT：zstd 约 17.2s，lz4hc 约 50.5s；压缩结果和池占用
 ## UFFDIO_MOVE hybrid 修复
 
 批量路径按 src/dst 双 PMD 边界；如果源 folio 曾经是 large folio（split THP），强制单 PTE 搬移，避免 batched present 路径错误。
+
+## UFFDIO_MOVE adjacent-VMA 修复
+
+相邻/合并 VMA 时整个 UFFDIO_MOVE 范围强制单 PTE；非相邻范围保留双 PMD 边界批量。此前的 large-folio force_single 试验逻辑已移除。
