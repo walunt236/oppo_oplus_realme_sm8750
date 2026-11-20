@@ -273,3 +273,7 @@ QEMU 256MB PAGEOUT：zstd 约 17.2s，lz4hc 约 50.5s；压缩结果和池占用
 ## 真机 large folio UFFD 现象
 
 4K/NOHUGEPAGE 整段和逐页均通过；64KB THP 的最后一个 chunk 出现 EAGAIN 后 EEXIST，目标页读取阻塞。详见 uffd-large-folio-phone.md。
+
+## UFFDIO_MOVE single-PTE 修复
+
+6.6 vendor batched-PTE 路径在 large folio 最后一段会留下部分 destination PTE（EEXIST）。暂时改为每次只移动一个 PTE，优先保证正确性。
