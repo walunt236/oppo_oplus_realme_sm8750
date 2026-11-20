@@ -277,3 +277,7 @@ QEMU 256MB PAGEOUT：zstd 约 17.2s，lz4hc 约 50.5s；压缩结果和池占用
 ## UFFDIO_MOVE single-PTE 修复
 
 6.6 vendor batched-PTE 路径在 large folio 最后一段会留下部分 destination PTE（EEXIST）。暂时改为每次只移动一个 PTE，优先保证正确性。
+
+## 最优 UFFDIO_MOVE 修复
+
+批量路径限制在 src/dst 两个 PMD 的共同边界内，保留普通批量搬移，避免 dst_pte 越过自身页表。
