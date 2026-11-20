@@ -289,3 +289,7 @@ QEMU 256MB PAGEOUT：zstd 约 17.2s，lz4hc 约 50.5s；压缩结果和池占用
 ## UFFDIO_MOVE adjacent-VMA 修复
 
 相邻/合并 VMA 时整个 UFFDIO_MOVE 范围强制单 PTE；非相邻范围保留双 PMD 边界批量。此前的 large-folio force_single 试验逻辑已移除。
+
+## UFFD 清理
+
+移除了相邻 VMA force_single、双 PMD 启发式和临时 printk，保留原始 6.6 UFFD 实现与 memcomp 0004 分支，准备局部回移 upstream 6.12 move 实现。
