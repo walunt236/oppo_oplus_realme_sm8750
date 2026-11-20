@@ -305,3 +305,9 @@ QEMU 256MB PAGEOUT：zstd 约 17.2s，lz4hc 约 50.5s；压缩结果和池占用
 ## UFFD 实验清理
 
 移除 contpte unfold、相邻 VMA、单 PTE、双 PMD、upstream 回移和所有调试 printk，恢复 vendor UFFDIO_MOVE + memcomp 0001/0004。
+
+## 精简统计 + KUnit
+
+- 新增 user_events: evictions/evicted_pages/refaults/refault_pages
+- async eviction 计数
+- KUnit format 4/4 + zero 3/3
