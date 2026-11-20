@@ -269,3 +269,7 @@ CI 镜像额外通过 shmem 400MB 压力数据校验（VERIFY_OK 400 MB）。
 ## zstd vs lz4hc
 
 QEMU 256MB PAGEOUT：zstd 约 17.2s，lz4hc 约 50.5s；压缩结果和池占用 zstd 略优，refault 差异在噪声内。详见 other_patch/memcomp/bench/compressor-comparison.md。
+
+## 真机 large folio UFFD 现象
+
+4K/NOHUGEPAGE 整段和逐页均通过；64KB THP 的最后一个 chunk 出现 EAGAIN 后 EEXIST，目标页读取阻塞。详见 uffd-large-folio-phone.md。
