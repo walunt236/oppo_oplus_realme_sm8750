@@ -297,3 +297,7 @@ QEMU 256MB PAGEOUT：zstd 约 17.2s，lz4hc 约 50.5s；压缩结果和池占用
 ## UFFDIO_MOVE 局部回移 upstream 6.12
 
 移除 vendor batched move_present_ptes，改用 upstream 6.12 的单页 move_pages_pte + move_present_pte + anon_vma 序列化；保留 memcomp token 分支。QEMU pagewise THP 测试 ALL_OK。
+
+## UFFD 回移已回滚
+
+恢复为 0001/0004 的 UFFDIO_MOVE memcomp 支持，移除 upstream 6.12 回移、单页/相邻 VMA/双 PMD 等实验修复。
