@@ -18,7 +18,8 @@ on:
         description: '集成susfs'
         required: true
         type: boolean
-        default: true\r?\n      kpm_enable:
+        default: true
+      kpm_enable:
         description: '集成kpm'
         required: true
         type: choice
@@ -66,11 +67,6 @@ on:
         required: true
         type: boolean
         default: true
-      sched_ext_enable:
-        description: '启用 sched_ext（实验；Scene 调度需要）'
-        required: true
-        type: boolean
-        default: false
       memcomp_enable:
         description: '启用 memcomp（实验；会关闭 zram/zswap）'
         required: true
@@ -162,7 +158,6 @@ jobs:
       ADIOS_ENABLE: ${{ inputs.adios_enable }}
       BBR3_ENABLE: ${{ inputs.bbr3_enable }}
       SCHED_ENABLE: ${{ inputs.sched_enable }}
-      SCHED_EXT_ENABLE: ${{ inputs.sched_ext_enable }}
       MEMCOMP_ENABLE: ${{ inputs.memcomp_enable }}
       LZ4ZSTD_ENABLE: ${{ inputs.lz4zstd_enable }}
       F2FS_ENABLE: ${{ inputs.f2fs_enable }}
@@ -333,4 +328,3 @@ jobs:
         with:
           name: ccache-debug-log
           path: ${{ github.workspace }}/kernel_workspace/ccache.log
-# memcomp optional switch (default off)
