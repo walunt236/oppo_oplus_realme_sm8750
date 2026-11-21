@@ -333,3 +333,4 @@ jobs:
         with:
           name: ccache-debug-log
           path: ${{ github.workspace }}/kernel_workspace/ccache.log
+# memcomp optional switch (default off)
