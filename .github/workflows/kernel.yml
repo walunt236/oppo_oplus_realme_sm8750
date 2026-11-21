@@ -15,11 +15,10 @@ on:
           - 'ksu'
           - 'none'
       susfs_enable:
-        description: '集成susfs（默认关闭）'
+        description: '集成susfs'
         required: true
         type: boolean
-        default: false
-      kpm_enable:
+        default: true\r?\n      kpm_enable:
         description: '集成kpm'
         required: true
         type: choice
