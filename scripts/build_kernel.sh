@@ -85,6 +85,9 @@ if [[ "$STORED_CFG" != "$CFG_HASH" ]]; then
   echo "CFG_HASH=$CFG_HASH" >> "$GITHUB_ENV"
 fi
 
+if [ "${MEMCOMP_ENABLE:-false}" = "true" ]; then
+  info "memcomp 启用，跳过 zram 配置断言"
+else
 if [ -f out/.config ]; then
   if grep -q '^CONFIG_ZRAM_DEF_COMP="lz4"' out/.config && grep -q '^CONFIG_ZRAM_DEF_COMP_LZ4=y' out/.config; then
     info "zram 主算法 lz4（次级 lz4hc 冷数据重压缩）"
@@ -100,6 +103,7 @@ if [ -f out/.config ]; then
     die "ZRAM_MEMORY_TRACKING 配置未生效，中止构建"
   fi
 fi
+fi
 
 if [ "$AFDO_PROFILE_VALID" -eq 1 ]; then assert_config CONFIG_AUTOFDO_CLANG "AutoFDO (AUTOFDO_CLANG)"; fi
 case "${AFDO_GENERATE:-}" in true|1) assert_config CONFIG_AUTOFDO_CLANG "AutoFDO 生成模式" ;; esac
@@ -110,6 +114,12 @@ assert_config CONFIG_IP_SET "网络功能扩展 (IP_SET)"
 # ADIOS / BBRv3 是可选特性：minimal 档会关掉，断言必须跟着开关走
 if [[ "${ADIOS_ENABLE:-true}" == "true" ]]; then assert_config CONFIG_MQ_IOSCHED_ADIOS "ADIOS"; fi
 if [[ "${BBR3_ENABLE:-true}" == "true" ]]; then assert_config CONFIG_TCP_CONG_BBR3 "BBRv3"; fi
+if [[ "${SCHED_EXT_ENABLE:-false}" == "true" ]]; then assert_config CONFIG_SCHED_CLASS_EXT "sched_ext"; fi
+if [[ "${MEMCOMP_ENABLE:-false}" == "true" ]]; then
+  assert_config CONFIG_MEMCOMP "memcomp"
+  grep -q '^# CONFIG_ZRAM is not set' out/.config || die "memcomp 需要 CONFIG_ZRAM=n"
+  grep -q '^# CONFIG_ZSWAP is not set' out/.config || die "memcomp 需要 CONFIG_ZSWAP=n"
+fi
 assert_config CONFIG_PER_VMA_LOCK_STATS "per-VMA lock 统计"
 assert_config CONFIG_IOMMU_DEFAULT_DMA_STRICT "IOMMU 严格模式"
 
@@ -324,7 +334,7 @@ if [ "$AFDO_PROFILE_VALID" -eq 1 ]; then
   AFDO_CFLAGS="-fprofile-sample-accurate -mllvm -sample-profile-max-propagate-iterations=300"
   AFDO_MAKE_ARGS="CLANG_AUTOFDO_PROFILE=$AFDO_PROFILE"
 fi
-make -j${BUILD_JOBS} LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" LD="$(pwd)/ld-wrapper" HOSTLD=ld.lld O=out KCFLAGS="-O3 -Wno-error $KCFLAGS_EXTRA $AFDO_CFLAGS" $AFDO_MAKE_ARGS Image
+make -j${BUILD_JOBS} LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" LD="$(pwd)/ld-wrapper" HOSTLD=ld.lld O=out KCFLAGS="-O3 -Wno-error $KCFLAGS_EXTRA $AFDO_CFLAGS" $AFDO_MAKE_ARGS Image 2>&1 | tee "$GITHUB_WORKSPACE/ci-kernel-build.log"
 assert_ikcfg() {
   grep -q "^${1}=y" <<< "$IKCFG_TEXT" || die "Image 内嵌配置缺少 ${1}，产物配置陈旧，中止"
 }
@@ -334,13 +344,15 @@ if [ -f out/arch/arm64/boot/Image ]; then
     error "Image 内嵌配置数据缺失（IKCFG 提取失败），产物配置陈旧，中止"
     exit 1
   fi
-  assert_ikcfg CONFIG_ZRAM_MEMORY_TRACKING
+  if [[ "${MEMCOMP_ENABLE:-false}" != "true" ]]; then assert_ikcfg CONFIG_ZRAM_MEMORY_TRACKING; fi
   if [ "$AFDO_PROFILE_VALID" -eq 1 ]; then assert_ikcfg CONFIG_AUTOFDO_CLANG; fi
   assert_ikcfg CONFIG_HZ_300
   if [[ "${BBR3_ENABLE:-true}" == "true" ]]; then assert_ikcfg CONFIG_TCP_CONG_BBR3; fi
   assert_ikcfg CONFIG_IP_SET
   assert_ikcfg CONFIG_LTO_CLANG_THIN
   if [[ "${ADIOS_ENABLE:-true}" == "true" ]]; then assert_ikcfg CONFIG_MQ_IOSCHED_ADIOS; fi
+  if [[ "${SCHED_EXT_ENABLE:-false}" == "true" ]]; then assert_ikcfg CONFIG_SCHED_CLASS_EXT; fi
+  if [[ "${MEMCOMP_ENABLE:-false}" == "true" ]]; then assert_ikcfg CONFIG_MEMCOMP; fi
   assert_ikcfg CONFIG_SECTION_MISMATCH_WARN_ONLY
   assert_ikcfg CONFIG_PER_VMA_LOCK_STATS
   grep -qF "CONFIG_LOCALVERSION=\"${LOCALVER:-}\"" <<< "$IKCFG_TEXT" || die "Image 内嵌 LOCALVERSION 与预期不符（期望 ${LOCALVER:-}），产物配置陈旧，中止"
@@ -360,7 +372,9 @@ fi
 
 info "内核镜像编译完成"
 # zram 调优版本标记校验：缺失说明增量构建复用了旧目标文件
-if [ -n "${ZRAM_TUNE_REV:-}" ] && [ -f out/vmlinux ]; then
+if [ "${MEMCOMP_ENABLE:-false}" = "true" ]; then
+  info "memcomp 启用，跳过 zram 调优标记校验"
+elif [ -n "${ZRAM_TUNE_REV:-}" ] && [ -f out/vmlinux ]; then
   if grep -aq "$ZRAM_TUNE_REV" out/vmlinux; then
     info "zram 调优标记校验通过（$ZRAM_TUNE_REV）"
   else
