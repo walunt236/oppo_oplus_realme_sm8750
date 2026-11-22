@@ -74,3 +74,5 @@ bash "$GITHUB_WORKSPACE/scripts/features/wild_extra.sh"
 
 # memcomp（实验开关 MEMCOMP_ENABLE=true）
 bash "$GITHUB_WORKSPACE/scripts/features/memcomp.sh"
+# mTHP compaction_capture (OpenCloudOS PR 1218)
+bash "$GITHUB_WORKSPACE/scripts/features/mthp.sh"
