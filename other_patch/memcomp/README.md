@@ -59,6 +59,8 @@ OOM killer 会挑最大的进程（通常是 system_server）。这里给池子�
 - 压缩等待（异步 payload 完成、压缩上下文获取）记入 `psi_memstall`，
   PSI 因此反映 memcomp 的真实阻塞代价。
 - 观测：`cat /sys/kernel/mm/memcomp/pool` → `limit used over hits`。
+- 运行时可调：`echo <bytes> > /sys/kernel/mm/memcomp/pool_limit`，
+  `echo off > .../pool_limit` 彻底关闭（改回 `memcomp.pool_pct` 需要重启）。
 
 注意：这是 Android 侧的适配策略，不是上游 memcomp 的接口；上游化时应该拆掉。
 
