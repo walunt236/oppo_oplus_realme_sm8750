@@ -56,7 +56,9 @@ OOM killer 会挑最大的进程（通常是 system_server）。这里给池子�
   新的匿名页不再压缩，回收回退到普通路径，压力通过 `/proc/pressure/memory`
   暴露给 lmkd，由它提前杀后台，而不是等分配失败。
 - 回落到上限的 90% 以下才恢复压缩（迟滞，避免抖动）。
-- 另有**空闲内存闸门**：可用空闲低于 RAM 的 4% 时也停止准入，回到 8% 以上才恢复；
+- 另有**空闲内存闸门**：可用内存（MemAvailable）低于 RAM 的 6% 时停止准入，回到 10% 以上才恢复；
+  注意用的是 MemAvailable 不是 MemFree：安卓会故意把空闲页压到接近 0（页缓存），
+  用 MemFree 会导致开机就永远停压（真机实测踩过）。
   它属于“有上限模式”，`pool_limit=off` 时关闭（保持旧行为，便于做对照）。
 - 压缩等待（异步 payload 完成、压缩上下文获取）记入 `psi_memstall`，
   PSI 因此反映 memcomp 的真实阻塞代价。
@@ -75,7 +77,7 @@ OOM killer 会挑最大的进程（通常是 system_server）。这里给池子�
 | 层 | 机制 | 开关 | 观测 |
 |---|---|---|---|
 | 1 | 池物理上限（默认 20% RAM，迟滞 90% 恢复） | `memcomp.pool_pct=` / `pool_limit` sysfs | `status: limit_bytes/used_bytes` |
-| 2 | 空闲内存闸门（<4% 停，>8% 恢复） | 随层 1（`off` 时一并关闭） | `status: over` |
+| 2 | 空闲内存闸门（**MemAvailable** <6% 停，>10% 恢复） | `free_guard` sysfs（"6 10"）；`pool_limit=off` 时一并关闭 | `status: over` |
 | 3 | PSI 记账（压缩等待计入 `psi_memstall`） | 无（始终） | `/proc/pressure/memory` |
 | 4 | `zs_compact` 周期整理（≥25% 上限，每 ≥15s） | 随层 1 | `status: compact_runs/compact_freed_pages` |
 
