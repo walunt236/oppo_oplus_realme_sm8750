@@ -42,6 +42,9 @@ export PENDING_SYNC  # 由 apply_patches.sh 读取
 sync_repo() {
   local url="$1" dir="$2" branch="${3:-main}"
   if [ -d "$dir/.git" ]; then
+    # 上游地址可能在 build.env 里改过（例如 SUSFS 官方源迁到 GitLab），
+    # 缓存目录沿用旧 remote 会一直 404，这里每次同步前对齐一次
+    git -C "$dir" remote set-url origin "$url" 2>/dev/null || true
     if glr -C "$dir" fetch --depth=1 origin "$branch"; then
       git -C "$dir" reset --hard FETCH_HEAD
       info "[动态] $dir 已同步 $branch 最新"

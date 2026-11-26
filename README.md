@@ -71,8 +71,8 @@
 |---|---|
 | `.github/workflows/` | `kernel.yml` 主编排、`lint.yml` 静态检查、两个清理工作流 |
 | `scripts/` | 构建阶段脚本，`build.env` 是所有参数（含工具链版本、仓库地址）的唯一来源 |
-| `scripts/features/` | 18 个功能模块，顺序固定，见 [功能模块清单](scripts/features/README.md) |
-| `configs/features/` | 17 个 defconfig 配置片段 |
+| `scripts/features/` | 功能模块，调用顺序固定在 `apply_patches.sh`，索引见 [功能模块清单](scripts/features/README.md) |
+| `configs/features/` | defconfig 配置片段，同键冲突由 `scripts/check_configs.py` 校验 |
 | `other_patch/` | 随仓库版本化的补丁（外部的在构建时拉取） |
 | `ak3_overlay/` | AnyKernel3 覆盖层与打包工具 |
 | `lib/ccache-x86-64` | ccache 二进制，VM 首次安装用 |
@@ -94,7 +94,7 @@ bash scripts/lint.sh
 - ReSukiSU：[ReSukiSU/ReSukiSU](https://github.com/ReSukiSU/ReSukiSU)
 - KernelSU：[tiann/KernelSU](https://github.com/tiann/KernelSU)
 - KernelSU Next：[pershoot/KernelSU-Next](https://github.com/pershoot/KernelSU-Next)
-- susfs4ksu：[ShirkNeko/susfs4ksu](https://github.com/ShirkNeko/susfs4ksu)
+- susfs4ksu（官方源已迁至 GitLab）：[simonpunk/susfs4ksu](https://gitlab.com/simonpunk/susfs4ksu)
 - SukiSU 补丁：[SukiSU-Ultra/SukiSU_patch](https://github.com/SukiSU-Ultra/SukiSU_patch)
 - 基带保护：[vc-teahouse/Baseband-guard](https://github.com/vc-teahouse/Baseband-guard)
 - LZ4 NEON ASM：[ferstar](https://github.com/ferstar) / [Xiaomichael](https://github.com/Xiaomichael) / [cctv18](https://github.com/cctv18)

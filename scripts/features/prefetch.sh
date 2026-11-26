@@ -30,7 +30,7 @@ export SUSFS_CACHE_DIR ZRAM_CACHE_DIR SUKI_CACHE_DIR WILD_DIR
 if [[ "$SUSFS_ENABLE" == "true" && "$KSU_TYPE" != "none" ]]; then
   SUSFS_BRANCH="${SUSFS_BRANCH:-gki-${QCOM_SERIES:-android15-6.6}}"
   export SUSFS_BRANCH
-  sync_repo "https://github.com/ShirkNeko/susfs4ksu.git" "$SUSFS_CACHE_DIR" "$SUSFS_BRANCH" || true &
+  sync_repo "${SUSFS_REPO:-https://gitlab.com/simonpunk/susfs4ksu.git}" "$SUSFS_CACHE_DIR" "$SUSFS_BRANCH" || true &
 fi
 sync_repo "https://github.com/mrcxlinux/kernel_patches.git" "$ZRAM_CACHE_DIR" || true &
 if [[ "$LZ4KD_ENABLE" == "true" ]]; then
@@ -42,8 +42,8 @@ wait
 # release 模式下，SUSFS 补丁必须与 KernelSU 发布同期，否则会大面积 reject。
 if [[ "$KSU_TYPE" == "ksu" && "${KSU_CHANNEL:-main}" == "release" && -n "${KSU_TAG_DATE:-}" ]]; then
   SUSFS_ERA_SHA=$(curl -sL --retry 3 --retry-delay 5 --retry-all-errors --max-time 20 \
-    "https://api.github.com/repos/ShirkNeko/susfs4ksu/commits?sha=${SUSFS_BRANCH}&until=${KSU_TAG_DATE}&per_page=1" 2>/dev/null \
-    | sed -n 's/.*"sha"[[:space:]]*:[[:space:]]*"\([0-9a-f]\{40\}\)".*/\1/p' | head -1)
+    "${SUSFS_API:-https://gitlab.com/api/v4/projects/simonpunk%2Fsusfs4ksu}/repository/commits?ref_name=${SUSFS_BRANCH}&until=${KSU_TAG_DATE}&per_page=1" 2>/dev/null \
+    | sed -n 's/.*"id"[[:space:]]*:[[:space:]]*"\([0-9a-f]\{40\}\)".*/\1/p' | head -1)
   if [ -n "$SUSFS_ERA_SHA" ] && \
      glr -C "$SUSFS_CACHE_DIR" fetch -q --depth=1 origin "$SUSFS_ERA_SHA" 2>/dev/null && \
      git -C "$SUSFS_CACHE_DIR" checkout -q FETCH_HEAD 2>/dev/null; then

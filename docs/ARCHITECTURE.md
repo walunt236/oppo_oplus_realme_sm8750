@@ -87,7 +87,7 @@ ccache key = `ccache-ecsv3-<内核主版本>-<SUBLEVEL>-<Droidspaces 开关>`，
 两类来源：
 
 - **仓库内**（`other_patch/`）：自维护补丁，随仓库版本化，15 个文件
-- **运行时拉取**：`susfs4ksu`、`mrcxlinux/kernel_patches`、`ShirkNeko/SukiSU_patch`、`WildKernels/kernel_patches`，缓存进 `~/.cache_patches`
+- **运行时拉取**：`susfs4ksu`（官方源在 GitLab）、`mrcxlinux/kernel_patches`、`ShirkNeko/SukiSU_patch`、`WildKernels/kernel_patches`，缓存进 `~/.cache_patches`
 
 应用策略分 `strict`（失败即 `die`）与 `nonstrict`（打 `.rej` 后继续），由 `apply_patch_file` 的 `mode` 决定。
 SUSFS 在 `KSU_CHANNEL=release` 时会回退到 KernelSU 发布同期的提交，避免大面积 reject。
