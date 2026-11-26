@@ -45,6 +45,23 @@
 说明 memcomp 在压力下能压缩匿名页并避免 OOM。
 测试使用了人为高 watermark，且大部分是零页，压缩比不代表真实负载。
 
+## Pool guard（防止撞墙，2026-11-27）
+
+轻量版没有 writeback，压缩块是页面唯一副本，池子只涨不缩，涨到 OOM 时内核
+OOM killer 会挑最大的进程（通常是 system_server）。这里给池子加上限，并把
+压力信号交还给标准的 PSI：
+
+- 池子物理占用超过 `memcomp.pool_pct`（默认 20% 总内存，`0` 关闭；
+  `memcomp.pool_bytes=` 可给绝对字节数）后，`memcomp_available()` 返回 false：
+  新的匿名页不再压缩，回收回退到普通路径，压力通过 `/proc/pressure/memory`
+  暴露给 lmkd，由它提前杀后台，而不是等分配失败。
+- 回落到上限的 90% 以下才恢复压缩（迟滞，避免抖动）。
+- 压缩等待（异步 payload 完成、压缩上下文获取）记入 `psi_memstall`，
+  PSI 因此反映 memcomp 的真实阻塞代价。
+- 观测：`cat /sys/kernel/mm/memcomp/pool` → `limit used over hits`。
+
+注意：这是 Android 侧的适配策略，不是上游 memcomp 的接口；上游化时应该拆掉。
+
 ## 尚未完成
 
 - 真机刷入/启动验证
