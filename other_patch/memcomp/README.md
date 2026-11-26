@@ -68,6 +68,33 @@ OOM killer 会挑最大的进程（通常是 system_server）。这里给池子�
 
 注意：这是 Android 侧的适配策略，不是上游 memcomp 的接口；上游化时应该拆掉。
 
+## 无 swap 完整版（2026-11-27）
+
+四层策略，全部只影响“压缩准入”，不碰数据路径（写回/读回/swapoff 一行都没搬）：
+
+| 层 | 机制 | 开关 | 观测 |
+|---|---|---|---|
+| 1 | 池物理上限（默认 20% RAM，迟滞 90% 恢复） | `memcomp.pool_pct=` / `pool_limit` sysfs | `status: limit_bytes/used_bytes` |
+| 2 | 空闲内存闸门（<4% 停，>8% 恢复） | 随层 1（`off` 时一并关闭） | `status: over` |
+| 3 | PSI 记账（压缩等待计入 `psi_memstall`） | 无（始终） | `/proc/pressure/memory` |
+| 4 | `zs_compact` 周期整理（≥25% 上限，每 ≥15s） | 随层 1 | `status: compact_runs/compact_freed_pages` |
+
+一次刷机收集数据：
+
+```bash
+adb push other_patch/memcomp/device/memcomp_sample.sh /data/local/tmp/
+adb shell su -c 'nohup sh /data/local/tmp/memcomp_sample.sh /data/local/tmp/memcomp.csv 60 >/dev/null 2>&1 &'
+# 7 天后
+adb pull /data/local/tmp/memcomp.csv
+```
+
+判读：`over=1` 且 `limit_hits` 增长说明池子真的到顶；`psi_some10` 抬头说明
+压力被看见；`swapfree` 应恒为 0（无 swap）；没有 `pool limit reached` 之外的
+内核告警才算通过。
+
+未做（有意）：per-memcg 份额（需要 Android cgroup 契约，先验证池上限效果）、
+老化重压缩（默认压缩器已是 zstd，内核 crypto 接口不给级别，收益小风险大）。
+
 ## 尚未完成
 
 - 真机刷入/启动验证
