@@ -58,7 +58,9 @@ OOM killer 会挑最大的进程（通常是 system_server）。这里给池子�
 - 回落到上限的 90% 以下才恢复压缩（迟滞，避免抖动）。
 - 压缩等待（异步 payload 完成、压缩上下文获取）记入 `psi_memstall`，
   PSI 因此反映 memcomp 的真实阻塞代价。
-- 观测：`cat /sys/kernel/mm/memcomp/pool` → `limit used over hits`。
+- 观测：`cat /sys/kernel/mm/memcomp/pool` → `limit used over hits compact_runs compact_freed_pages`。
+- 池子在「上限的 25% 以上且未超限」时，每 ≥15 秒做一次 `zs_compact()`：
+  只回收 zsmalloc 不再需要的空闲页，不回收 payload，用来抵消“同样存储量、物理占用随 uptime 增长”的碎片化。
 - 运行时可调：`echo <bytes> > /sys/kernel/mm/memcomp/pool_limit`，
   `echo off > .../pool_limit` 彻底关闭（改回 `memcomp.pool_pct` 需要重启）。
 
