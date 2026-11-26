@@ -184,6 +184,11 @@ if [ -s "$PENDING_SYNC" ]; then
   : > "$PENDING_SYNC.tmp"
   while IFS='|' read -r u d b; do
     [ -z "$d" ] && continue
+    # pending 里可能存着迁移前的旧地址（如 SUSFS 从 GitHub 迁到 GitLab），
+    # 优先用 build.env 里当前配置，否则这条记录会永远 404、每次构建刷 ERROR
+    if [[ "$u" == *susfs4ksu* ]]; then
+      u="${SUSFS_REPO:-$u}"
+    fi
     if sync_repo "$u" "$d" "$b"; then
       info "补拉成功: $d（下次构建生效）"
     else

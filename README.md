@@ -25,7 +25,7 @@
 | 参数 | 类型 | 默认 | 说明 |
 |---|---|---|---|
 | `ksu_type` | choice | `ksu` | `resukisu` / `sukisu` / `ksunext` / `ksu` / `none` |
-| `susfs_enable` | bool | `true` | 需 `ksu_type != none`；关闭时写 `CONFIG_KSU_SUSFS=n` |
+| `susfs_enable` | bool | `false` | 需 `ksu_type != none`；关闭时写 `CONFIG_KSU_SUSFS=n`，预取与补丁全部跳过 |
 | `kpm_enable` | choice | `false` | `false` / `builtin`（仅 sukisu、resukisu）/ `kpn` |
 | `rekernel_enable` | bool | `false` | Re-Kernel 支持 |
 | `baseband_guard` | bool | `false` | 基带保护 LSM |
