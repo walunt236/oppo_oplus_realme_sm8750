@@ -56,6 +56,8 @@ OOM killer 会挑最大的进程（通常是 system_server）。这里给池子�
   新的匿名页不再压缩，回收回退到普通路径，压力通过 `/proc/pressure/memory`
   暴露给 lmkd，由它提前杀后台，而不是等分配失败。
 - 回落到上限的 90% 以下才恢复压缩（迟滞，避免抖动）。
+- 另有**空闲内存闸门**：可用空闲低于 RAM 的 4% 时也停止准入，回到 8% 以上才恢复；
+  它属于“有上限模式”，`pool_limit=off` 时关闭（保持旧行为，便于做对照）。
 - 压缩等待（异步 payload 完成、压缩上下文获取）记入 `psi_memstall`，
   PSI 因此反映 memcomp 的真实阻塞代价。
 - 观测：`cat /sys/kernel/mm/memcomp/pool` → `limit used over hits compact_runs compact_freed_pages`。
