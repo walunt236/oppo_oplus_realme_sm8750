@@ -97,6 +97,24 @@ adb pull /data/local/tmp/memcomp.csv
 未做（有意）：per-memcg 份额（需要 Android cgroup 契约，先验证池上限效果）、
 老化重压缩（默认压缩器已是 zstd，内核 crypto 接口不给级别，收益小风险大）。
 
+## mTHP × UFFDIO_MOVE：已知缺陷与当前处理（2026-11-27）
+
+症状：ART 在 64KB mTHP 的堆上做非对齐 UFFDIO_MOVE 时，偶发 EEXIST / 目的页
+变成零页。根因在 OnePlus 6.6 的 mTHP/PTE 核心（不是 contpte，也不是 UFFD move
+本身），已尝试 UFFD 层单页独占/双 PMD/相邻 VMA/拆分重试、mTHP 层关 CONTPTE 与
+两阶段拆分、以及 6.12 整段回移，全部卡在非对齐地址。
+
+当前处理：
+- 规避：mTHP 保持 opt-in（TRANSHPARENT_HUGEPAGE=madvise + 64kB=inherit），
+  ART 堆因此保持 4K；不要再把 THP 改回 always。
+- 已修（A）：memcomp 的 reservation 否决会让 split_folio() 返回 -EBUSY，UFFDIO_MOVE
+  因此整段失败、重试时撞上已搬移的目的页得到 -EEXIST。现在 move 路径遇到
+  `folio_memcomp_reserved()` 时有界等待（最多 100×~0.1ms）后重试 split，
+  避免把短暂的 store 窗口暴露给用户态。
+- 未修（B）：PTE-mapped large folio 的 split/migration 还原依赖 6.12 mm 代码与
+  6.6 vendor 头/arch 的混合实现，可能把未参与搬移的 PTE 还原错（零页）。
+  根治需要统一 mm 代际（6.12/6.18 基线），暂不做。
+
 ## 尚未完成
 
 - 真机刷入/启动验证
