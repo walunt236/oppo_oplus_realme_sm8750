@@ -16,7 +16,9 @@ COMMON="$WS/kernel_workspace/common"
 [ -d "$COMMON" ] || { warn "[WILD_EXTRA] 内核目录不存在"; exit 0; }
 cd "$COMMON"
 
-for p in adjust_cpu_scan_order clear_page_16bytes_align use_unlikely_wrap_cpufreq; do
+# use_unlikely_wrap_cpufreq 已移除：它改的是 cpumask_min_limit_store[]，只存在于
+# add_limitation_scaling_min_freq 特性里（我们未启用），无依赖时永远无法应用。
+for p in adjust_cpu_scan_order clear_page_16bytes_align; do
   f="$WILD_DIR/common/$p.patch"
   if [ ! -f "$f" ]; then
     warn "[WILD_EXTRA] 缺少 $p.patch，跳过"

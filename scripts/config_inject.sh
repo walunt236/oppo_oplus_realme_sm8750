@@ -40,20 +40,10 @@ cat "$GITHUB_WORKSPACE/configs/features/zsmalloc_chain.config" >> "$DCFG"
 
 
 echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" >> "$DCFG"
-# sched_ext：默认关闭。源码里已有 kernel/sched/ext.c 和 core 集成，
-# 但 OnePlus 的 kernel/sched/Makefile 没有编 ext.o；开启时补回并加配置。
-if [[ "${SCHED_EXT_ENABLE:-false}" == "true" ]]; then
-  sed -i '/^CONFIG_SCHED_CLASS_EXT/d' "$DCFG"
-  cat "$GITHUB_WORKSPACE/configs/features/sched_ext.config" >> "$DCFG"
-  SCX_MK="./common/kernel/sched/Makefile"
-  if ! grep -qE 'CONFIG_SCHED_CLASS_EXT.*ext\.o' "$SCX_MK"; then
-    echo 'obj-$(CONFIG_SCHED_CLASS_EXT) += ext.o' >> "$SCX_MK"
-  fi
-  info "sched_ext 已启用（CONFIG_SCHED_CLASS_EXT=y + ext.o）"
-else
-  sed -i '/^CONFIG_SCHED_CLASS_EXT/d' "$DCFG"
-  echo "# CONFIG_SCHED_CLASS_EXT is not set" >> "$DCFG"
-fi
+# sched_ext：本树不可用（kernel/sched/Makefile 未编 ext.o，task_struct 缺 sched_ext_entity），
+# 固定关闭。原 SCHED_EXT_ENABLE 分支已移除（api接口从未在 workflow 暴露，且开启只会编译失败）。
+sed -i '/^CONFIG_SCHED_CLASS_EXT/d' "$DCFG"
+echo "# CONFIG_SCHED_CLASS_EXT is not set" >> "$DCFG"
 # ARM64 cluster 调度：让 EAS 感知多 cluster 拓扑（默认选项，纯拓扑感知）
 echo "CONFIG_SCHED_CLUSTER=y" >> "$DCFG"
 # （已移除无效的 check_defconfig 删除动作：本流水线不调用 build/build.sh，该校验从未执行）

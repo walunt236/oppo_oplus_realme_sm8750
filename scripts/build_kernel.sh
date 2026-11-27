@@ -114,7 +114,6 @@ assert_config CONFIG_IP_SET "网络功能扩展 (IP_SET)"
 # ADIOS / BBRv3 是可选特性：minimal 档会关掉，断言必须跟着开关走
 if [[ "${ADIOS_ENABLE:-true}" == "true" ]]; then assert_config CONFIG_MQ_IOSCHED_ADIOS "ADIOS"; fi
 if [[ "${BBR3_ENABLE:-true}" == "true" ]]; then assert_config CONFIG_TCP_CONG_BBR3 "BBRv3"; fi
-if [[ "${SCHED_EXT_ENABLE:-false}" == "true" ]]; then assert_config CONFIG_SCHED_CLASS_EXT "sched_ext"; fi
 if [[ "${MEMCOMP_ENABLE:-false}" == "true" ]]; then
   assert_config CONFIG_MEMCOMP "memcomp"
   grep -q '^# CONFIG_ZRAM is not set' out/.config || die "memcomp 需要 CONFIG_ZRAM=n"
@@ -351,7 +350,6 @@ if [ -f out/arch/arm64/boot/Image ]; then
   assert_ikcfg CONFIG_IP_SET
   assert_ikcfg CONFIG_LTO_CLANG_THIN
   if [[ "${ADIOS_ENABLE:-true}" == "true" ]]; then assert_ikcfg CONFIG_MQ_IOSCHED_ADIOS; fi
-  if [[ "${SCHED_EXT_ENABLE:-false}" == "true" ]]; then assert_ikcfg CONFIG_SCHED_CLASS_EXT; fi
   if [[ "${MEMCOMP_ENABLE:-false}" == "true" ]]; then assert_ikcfg CONFIG_MEMCOMP; fi
   assert_ikcfg CONFIG_SECTION_MISMATCH_WARN_ONLY
   assert_ikcfg CONFIG_PER_VMA_LOCK_STATS

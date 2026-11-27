@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# HMBIRD 模块：Overwriter / Hmbird Defconfig / 18 个内存与 IO 补丁 / EnablePOLLY / mm_* 回移
+# HMBIRD 模块：Overwriter / Hmbird Defconfig / 16 个内存与 IO 补丁 / EnablePOLLY / zsmalloc copy_page
 # 来源：scripts/apply_patches.sh 原第 87-152 行（原样搬迁）
 # 开关：无（原块始终执行）
 set -euo pipefail
@@ -53,29 +53,42 @@ patch -p1 -F 3 -f < "$HMBIRD_CFG" || {
   exit 1
 }
 
-for p in optimized_mem_operations file_struct_8bytes_align reduce_cache_pressure mem_opt_prefetch optimise_memcmp f2fs_reduce_congestion f2fs_enlarge_min_fsync_blocks increase_ext4_default_commit_age int_sqrt reduce_gc_thread_sleep_time increase_sk_mem_packets disable_cache_hot_buddy force_tcp_nodelay minimise_wakeup_time reduce_freeze_timeout silence_irq_cpu_logspam silence_system_logspam; do
-  patch -p1 --forward -f < "$WILD_DIR/common/$p.patch" || warn "$p.patch 应用失败，继续..."
+# disable_cache_hot_buddy 已移除：vendor 6.6.143 的 CACHE_HOT_BUDDY 默认就是 true，
+# 该补丁改成 false 后又会 sched.sh 的 sed 改回 true（净效果 = 无操作），故不再应用。
+for p in optimized_mem_operations file_struct_8bytes_align reduce_cache_pressure mem_opt_prefetch optimise_memcmp f2fs_reduce_congestion f2fs_enlarge_min_fsync_blocks increase_ext4_default_commit_age int_sqrt reduce_gc_thread_sleep_time increase_sk_mem_packets force_tcp_nodelay minimise_wakeup_time reduce_freeze_timeout silence_irq_cpu_logspam silence_system_logspam; do
+  if patch -p1 --forward -f < "$WILD_DIR/common/$p.patch" >/dev/null 2>&1; then
+    info "[HMBIRD] 已应用 $p"
+  else
+    warn "[HMBIRD] $p 应用失败或已存在，跳过"
+  fi
 done
+# EnablePOLLY：Polly 循环优化（优先用缓存，失败再下载）
 if [ -f "$HOME/.cache_patches/zram_patches/common/EnablePOLLY.patch" ]; then
   patch -p1 --forward -f < "$HOME/.cache_patches/zram_patches/common/EnablePOLLY.patch" || warn "EnablePOLLY.patch 应用失败，继续..."
 else
   fetch_gh_file "mrcxlinux/kernel_patches" "common/EnablePOLLY.patch" "main" "/tmp/EnablePOLLY.patch" || warn "EnablePOLLY.patch 下载失败，继续..."
   patch -p1 --forward -f < /tmp/EnablePOLLY.patch || warn "EnablePOLLY.patch 应用失败，继续..."
 fi
-curl -fSL --retry 3 --retry-delay 5 --retry-all-errors --connect-timeout 10 --max-time 30 -o /tmp/mm_zsmalloc.patch "https://github.com/brokestar233/android_kernel_common_oneplus_sm8750/commit/d831954.patch" || { warn "mm_zsmalloc 下载失败，跳过..."; rm -f /tmp/mm_zsmalloc.patch; }
-if [ -f /tmp/mm_zsmalloc.patch ]; then
-  patch -p1 --forward -f < /tmp/mm_zsmalloc.patch || warn "mm_zsmalloc 应用失败，继续..."
-fi
-curl -fSL --retry 3 --retry-delay 5 --retry-all-errors --connect-timeout 10 --max-time 30 -o /tmp/mm_kvmalloc.patch "https://github.com/brokestar233/android_kernel_common_oneplus_sm8750/commit/a8093f3.patch" || { warn "mm_kvmalloc 下载失败，跳过..."; rm -f /tmp/mm_kvmalloc.patch; }
-if [ -f /tmp/mm_kvmalloc.patch ]; then
-  patch -p1 --forward -f < /tmp/mm_kvmalloc.patch || warn "mm_kvmalloc 应用失败，继续..."
-fi
-curl -fSL --retry 3 --retry-delay 5 --retry-all-errors --connect-timeout 10 --max-time 30 -o /tmp/mm_slab.patch "https://github.com/brokestar233/android_kernel_common_oneplus_sm8750/commit/936de3f.patch" || { warn "mm_slab 下载失败，跳过..."; rm -f /tmp/mm_slab.patch; }
-if [ -f /tmp/mm_slab.patch ]; then
-  patch -p1 --forward -f < /tmp/mm_slab.patch || warn "mm_slab 应用失败，继续..."
-fi
-curl -fSL --retry 3 --retry-delay 5 --retry-all-errors --connect-timeout 10 --max-time 30 -o /tmp/mm_vmpressure.patch "https://github.com/brokestar233/android_kernel_common_oneplus_sm8750/commit/99b920c.patch" || { warn "mm_vmpressure 下载失败，跳过..."; rm -f /tmp/mm_vmpressure.patch; }
-if [ -f /tmp/mm_vmpressure.patch ]; then
-  patch -p1 --forward -f < /tmp/mm_vmpressure.patch || warn "mm_vmpressure 应用失败，继续..."
+
+# zsmalloc 压缩迁移用 copy_page 代替 memcpy：补丁已固化到 other_patch/mm/，不再依赖网络。
+# brokestar233 的另外三个补丁经复核后移除：
+#   mm_kvmalloc  —— 把 __GFP_NORETRY 换成清 __GFP_DIRECT_RECLAIM，会改变大块分配的失败率，
+#                    且 vendor 已有 adjust_kvmalloc_flags / use_vmalloc hook；
+#   mm_slab      —— 给所有 kmalloc cache 加 SLAB_HWCACHE_ALIGN，显著增加内存占用，与 memcomp 目标冲突；
+#   mm_vmpressure—— 只删注释，无行为变化。
+ZSC_PATCH="$GITHUB_WORKSPACE/other_patch/mm/zsmalloc_copy_page.patch"
+if [ -f "$ZSC_PATCH" ]; then
+  if patch -p1 --forward -f < "$ZSC_PATCH" >/dev/null 2>&1; then
+    info "[HMBIRD] zsmalloc copy_page 已应用"
+  else
+    warn "[HMBIRD] zsmalloc copy_page 未应用（可能已存在）"
+  fi
+  if grep -q 'copy_page(d_addr, s_addr)' mm/zsmalloc.c; then
+    info "[HMBIRD] zsmalloc copy_page 校验通过"
+  else
+    warn "[HMBIRD] zsmalloc copy_page 未生效"
+  fi
+else
+  warn "[HMBIRD] 缺少 other_patch/mm/zsmalloc_copy_page.patch，跳过"
 fi
 # ---- 原块结束 ----
