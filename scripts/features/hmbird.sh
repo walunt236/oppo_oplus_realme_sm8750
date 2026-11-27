@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# HMBIRD 模块：Overwriter / Hmbird Defconfig / 16 个内存与 IO 补丁 / EnablePOLLY / zsmalloc copy_page
+# HMBIRD 模块：Overwriter / Hmbird Defconfig / 16 个内存与 IO 补丁 / EnablePOLLY / mm 依赖补丁
 # 来源：scripts/apply_patches.sh 原第 87-152 行（原样搬迁）
 # 开关：无（原块始终执行）
 set -euo pipefail
@@ -70,25 +70,21 @@ else
   patch -p1 --forward -f < /tmp/EnablePOLLY.patch || warn "EnablePOLLY.patch 应用失败，继续..."
 fi
 
-# zsmalloc 压缩迁移用 copy_page 代替 memcpy：补丁已固化到 other_patch/mm/，不再依赖网络。
-# brokestar233 的另外三个补丁经复核后移除：
-#   mm_kvmalloc  —— 把 __GFP_NORETRY 换成清 __GFP_DIRECT_RECLAIM，会改变大块分配的失败率，
-#                    且 vendor 已有 adjust_kvmalloc_flags / use_vmalloc hook；
-#   mm_slab      —— 给所有 kmalloc cache 加 SLAB_HWCACHE_ALIGN，显著增加内存占用，与 memcomp 目标冲突；
-#   mm_vmpressure—— 只删注释，无行为变化。
-ZSC_PATCH="$GITHUB_WORKSPACE/other_patch/mm/zsmalloc_copy_page.patch"
-if [ -f "$ZSC_PATCH" ]; then
-  if patch -p1 --forward -f < "$ZSC_PATCH" >/dev/null 2>&1; then
-    info "[HMBIRD] zsmalloc copy_page 已应用"
+# mm_slab / mm_kvmalloc：2026-11-27 的 #59 构建（移除这两个补丁）在真机上卡开机，
+# 回滚后正常。两者暂定为“vendor 树隐性依赖”，在定位清楚前保留（见 other_patch/mm/）。
+for p in mm_kvmalloc mm_slab; do
+  f_="$GITHUB_WORKSPACE/other_patch/mm/$p.patch"
+  if [ -f "$f_" ]; then
+    if patch -p1 --forward -f < "$f_" >/dev/null 2>&1; then
+      info "[HMBIRD] 已应用 $p（vendor 依赖，暂保留）"
+    else
+      warn "[HMBIRD] $p 未应用（可能已存在）"
+    fi
   else
-    warn "[HMBIRD] zsmalloc copy_page 未应用（可能已存在）"
+    warn "[HMBIRD] 缺少 $f_，跳过 $p"
   fi
-  if grep -q 'copy_page(d_addr, s_addr)' mm/zsmalloc.c; then
-    info "[HMBIRD] zsmalloc copy_page 校验通过"
-  else
-    warn "[HMBIRD] zsmalloc copy_page 未生效"
-  fi
-else
-  warn "[HMBIRD] 缺少 other_patch/mm/zsmalloc_copy_page.patch，跳过"
-fi
+done
+grep -q 'Embrace davem' mm/slab_common.c && info "[HMBIRD] mm_slab 校验通过" || warn "[HMBIRD] mm_slab 未生效"
+grep -q '__GFP_DIRECT_RECLAIM' mm/util.c && info "[HMBIRD] mm_kvmalloc 校验通过" || warn "[HMBIRD] mm_kvmalloc 未生效"
+
 # ---- 原块结束 ----

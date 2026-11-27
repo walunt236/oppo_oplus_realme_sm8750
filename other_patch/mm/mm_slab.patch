@@ -1,0 +1,14 @@
+diff --git a/mm/slab_common.c b/mm/slab_common.c
+index 9ebe84dba06be..610963fd3b9cb 100644
+--- a/mm/slab_common.c
++++ b/mm/slab_common.c
+@@ -322,6 +322,9 @@ kmem_cache_create_usercopy(const char *name,
+ 	 */
+ 	flags &= CACHE_CREATE_MASK;
+ 
++	/* Embrace davem */
++	flags |= SLAB_HWCACHE_ALIGN;	
++
+ 	/* Fail closed on bad usersize of useroffset values. */
+ 	if (!IS_ENABLED(CONFIG_HARDENED_USERCOPY) ||
+ 	    WARN_ON(!usersize && useroffset) ||
